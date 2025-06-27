@@ -149,19 +149,19 @@ class OrderRepository extends BaseRepository {
    * @returns {Promise<Array>} 活跃订单数组
    */
   async getActiveOrdersByUser(userId, trx = null) {
-    return await this.findByUserId(userId, {
+    return this.findByUserId(userId, {
       status: 'active',
       orderBy: [{ column: 'createdAt', direction: 'desc' }]
     }, trx);
   }
 
   /**
-   * 获取待选择供应商的订单
+   * 获取待选择供应商的订单（简化版本）
    * @param {Object} options - 查询选项
    * @param {Object} trx - 可选的事务对象
    * @returns {Promise<Array>} 订单数组
    */
-  async getPendingOrders(options = {}, trx = null) {
+  async getAvailableOrders(options = {}, trx = null) {
     try {
       const {
         limit = null,
@@ -175,7 +175,7 @@ class OrderRepository extends BaseRepository {
         .limit(limit)
         .offset(offset);
     } catch (error) {
-      logger.error('获取待选择供应商的订单失败', {
+      logger.error('获取可用订单失败', {
         options,
         error: error.message
       });
@@ -318,7 +318,7 @@ class OrderRepository extends BaseRepository {
   }
 
   /**
-   * 搜索订单
+   * 搜索订单（优化版本）
    * @param {string} searchTerm - 搜索关键词
    * @param {Object} options - 搜索选项
    * @param {Object} trx - 可选的事务对象
@@ -333,13 +333,30 @@ class OrderRepository extends BaseRepository {
         offset = 0
       } = options;
 
-      let query = this.query(trx)
-        .where(function() {
-          this.where('id', 'like', `%${searchTerm}%`)
-            .orWhere('warehouse', 'like', `%${searchTerm}%`)
-            .orWhere('goods', 'like', `%${searchTerm}%`)
-            .orWhere('deliveryAddress', 'like', `%${searchTerm}%`);
+      // 限制搜索关键词长度，提高性能
+      if (searchTerm.length < 2) {
+        return [];
+      }
+
+      let query = this.query(trx);
+
+      // 优化搜索策略：优先精确匹配，再模糊匹配
+      if (searchTerm.length >= 8) {
+        // 可能是订单ID，优先精确匹配
+        query = query.where(function() {
+          this.where('id', searchTerm)
+            .orWhere('id', 'like', `${searchTerm}%`)
+            .orWhere('warehouse', 'like', `${searchTerm}%`)
+            .orWhere('goods', 'like', `${searchTerm}%`);
         });
+      } else {
+        // 短关键词，使用前缀匹配
+        query = query.where(function() {
+          this.where('warehouse', 'like', `${searchTerm}%`)
+            .orWhere('goods', 'like', `${searchTerm}%`)
+            .orWhere('deliveryAddress', 'like', `${searchTerm}%`);
+        });
+      }
 
       if (userId) {
         query = query.where('userId', userId);
@@ -351,11 +368,103 @@ class OrderRepository extends BaseRepository {
 
       return await query
         .orderBy('createdAt', 'desc')
-        .limit(limit)
+        .limit(Math.min(limit, 100)) // 限制最大返回数量
         .offset(offset);
     } catch (error) {
       logger.error('搜索订单失败', {
         searchTerm,
+        options,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 高级搜索订单（支持多字段组合搜索）
+   * @param {Object} searchParams - 搜索参数
+   * @param {Object} options - 搜索选项
+   * @param {Object} trx - 可选的事务对象
+   * @returns {Promise<Array>} 搜索结果
+   */
+  async advancedSearchOrders(searchParams, options = {}, trx = null) {
+    try {
+      const {
+        keyword = null,
+        warehouse = null,
+        goods = null,
+        deliveryAddress = null,
+        status = null,
+        userId = null,
+        startDate = null,
+        endDate = null
+      } = searchParams;
+
+      const {
+        limit = 50,
+        offset = 0,
+        orderBy = [{ column: 'createdAt', direction: 'desc' }]
+      } = options;
+
+      let query = this.query(trx);
+
+      // 关键词搜索（多字段）
+      if (keyword && keyword.trim()) {
+        const term = keyword.trim();
+        query = query.where(function() {
+          if (term.length >= 8) {
+            // 可能是订单ID
+            this.where('id', 'like', `${term}%`);
+          }
+          this.orWhere('warehouse', 'like', `${term}%`)
+            .orWhere('goods', 'like', `${term}%`)
+            .orWhere('deliveryAddress', 'like', `${term}%`);
+        });
+      }
+
+      // 精确字段搜索
+      if (warehouse) {
+        query = query.where('warehouse', 'like', `${warehouse}%`);
+      }
+
+      if (goods) {
+        query = query.where('goods', 'like', `${goods}%`);
+      }
+
+      if (deliveryAddress) {
+        query = query.where('deliveryAddress', 'like', `${deliveryAddress}%`);
+      }
+
+      if (status) {
+        query = query.where('status', status);
+      }
+
+      if (userId) {
+        query = query.where('userId', userId);
+      }
+
+      // 日期范围搜索
+      if (startDate && endDate) {
+        query = query.whereBetween('createdAt', [startDate, endDate]);
+      } else if (startDate) {
+        query = query.where('createdAt', '>=', startDate);
+      } else if (endDate) {
+        query = query.where('createdAt', '<=', endDate);
+      }
+
+      // 应用排序
+      if (orderBy && Array.isArray(orderBy)) {
+        orderBy.forEach(sort => {
+          query = query.orderBy(sort.column, sort.direction);
+        });
+      }
+
+      return await query
+        .limit(Math.min(limit, 100))
+        .offset(offset);
+    } catch (error) {
+      logger.error('高级搜索订单失败', {
+        searchParams,
         options,
         error: error.message
       });

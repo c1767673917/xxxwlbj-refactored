@@ -5,7 +5,7 @@
 
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const { TEST_CONFIG, getAuthHeaders, getProviderHeaders } = require('./config');
+const jwt = require('jsonwebtoken');
 
 describe('中间件功能集成测试', () => {
   let app;

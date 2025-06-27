@@ -34,7 +34,6 @@ jest.mock('jsonwebtoken', () => ({
 const { userRepo } = require('../../../src/repositories');
 const PasswordHistoryRepository = require('../../../src/repositories/PasswordHistoryRepository');
 const passwordPolicy = require('../../../src/utils/PasswordPolicy');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 describe('UserService', () => {

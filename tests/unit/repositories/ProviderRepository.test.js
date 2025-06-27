@@ -39,31 +39,31 @@ jest.mock('../../../src/repositories/BaseRepository', () => {
       return mockQuery;
     }
 
-    async findMany(conditions, options = {}, trx = null) {
+    findMany(conditions, options = {}, trx = null) {
       return [];
     }
 
-    async findOne(conditions, trx = null) {
+    findOne(conditions, trx = null) {
       return null;
     }
 
-    async findById(id, trx = null) {
+    findById(id, trx = null) {
       return null;
     }
 
-    async create(data, trx = null) {
+    create(data, trx = null) {
       return { id: 'test-id', ...data };
     }
 
-    async updateById(id, data, trx = null) {
+    updateById(id, data, trx = null) {
       return { id, ...data };
     }
 
-    async deleteById(id, trx = null) {
+    deleteById(id, trx = null) {
       return true;
     }
 
-    async count(conditions = {}, trx = null) {
+    count(conditions = {}, trx = null) {
       return 0;
     }
   };

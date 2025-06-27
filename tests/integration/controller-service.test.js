@@ -5,7 +5,6 @@
 
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const { TEST_CONFIG } = require('./config');
 
 describe('Controller与Service集成测试', () => {
   let app;

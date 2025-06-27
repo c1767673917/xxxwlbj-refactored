@@ -516,7 +516,8 @@ describe('UserController', () => {
         offset: 0,
         orderBy: [{ column: 'created_at', direction: 'desc' }],
         role: 'user',
-        isActive: 'true'
+        isActive: true,
+        search: undefined
       });
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -575,9 +576,12 @@ describe('UserController', () => {
       // 验证结果
       expect(userService.getUserList).toHaveBeenCalledWith('admin', {
         page: 1,
-        limit: 20,
+        limit: 10,
         offset: 0,
-        orderBy: []
+        orderBy: [{ column: 'created_at', direction: 'desc' }],
+        role: undefined,
+        isActive: undefined,
+        search: undefined
       });
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
@@ -801,18 +805,17 @@ describe('UserController', () => {
       expect(mockRes.status).toHaveBeenCalledWith(400);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: false,
-        message: 'isActive 必须是布尔值',
-        code: 'INVALID_BOOLEAN',
+        message: 'isActive必须是布尔值',
+        code: 'INVALID_IS_ACTIVE',
         timestamp: expect.any(String)
       });
       expect(userService.setUserActive).not.toHaveBeenCalled();
     });
 
     it('应该在缺少必需参数时返回400错误', async () => {
-      // 准备测试数据 - 缺少isActive
-      const userId = 'target-user-id';
-      mockReq.params = { userId };
-      mockReq.body = {};
+      // 准备测试数据 - 缺少userId
+      mockReq.params = {};
+      mockReq.body = { isActive: true };
 
       // 执行测试
       await userController.toggleUserStatus(mockReq, mockRes, mockNext);

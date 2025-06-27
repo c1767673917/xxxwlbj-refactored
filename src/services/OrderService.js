@@ -6,13 +6,14 @@
 const BaseService = require('./BaseService');
 const { orderRepo, quoteRepo } = require('../repositories');
 const OrderIdService = require('./OrderIdService');
-const { logger } = require('../config/logger');
+const { getFieldConfig } = require('../config/fieldConfig');
 
 class OrderService extends BaseService {
   constructor() {
     super('OrderService');
     this.orderIdService = new OrderIdService();
-    this.allowedSortFields = ['createdAt', 'updatedAt', 'status', 'selectedPrice'];
+    // 使用集中的字段配置
+    this.allowedSortFields = getFieldConfig('order', 'sortFields');
   }
 
   /**
@@ -22,7 +23,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 创建的订单
    */
   async createOrder(orderData, userId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       // 验证必需参数
       this.validateRequiredParams(orderData, ['warehouse', 'goods', 'deliveryAddress']);
       this.validateRequiredParams({ userId }, ['userId']);
@@ -91,7 +92,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 订单详情
    */
   async getOrderById(orderId, userId, userRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId, userId, userRole }, ['orderId', 'userId', 'userRole']);
 
       // 检查访问权限
@@ -125,7 +126,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 订单列表
    */
   async getUserOrders(userId, options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId }, ['userId']);
 
       // 标准化分页参数
@@ -161,7 +162,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 更新后的订单
    */
   async updateOrder(orderId, updateData, userId, userRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId, userId, userRole }, ['orderId', 'userId', 'userRole']);
 
       // 检查访问权限
@@ -233,7 +234,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 更新后的订单
    */
   async updateOrderStatus(orderId, status, userId, userRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId, status, userId, userRole }, ['orderId', 'status', 'userId', 'userRole']);
 
       // 验证状态值
@@ -281,7 +282,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 删除结果
    */
   async deleteOrder(orderId, userId, userRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId, userId, userRole }, ['orderId', 'userId', 'userRole']);
 
       // 检查访问权限
@@ -326,7 +327,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 更新后的订单
    */
   async selectProvider(orderId, provider, userId, userRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId, provider, userId, userRole }, ['orderId', 'provider', 'userId', 'userRole']);
 
       // 检查访问权限
@@ -376,7 +377,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 取消后的订单
    */
   async cancelOrder(orderId, reason, userId, userRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId, userId, userRole }, ['orderId', 'userId', 'userRole']);
 
       // 检查访问权限
@@ -414,19 +415,19 @@ class OrderService extends BaseService {
   }
 
   /**
-   * 获取订单统计信息
-   * @param {string} userId - 用户ID（可选，管理员可以不传）
+   * 获取用户订单统计信息
+   * @param {string} userId - 用户ID
    * @param {string} userRole - 用户角色
    * @param {Object} filters - 过滤条件
    * @returns {Promise<Object>} 统计信息
    */
-  async getOrderStats(userId, userRole, filters = {}) {
-    return await this.handleAsyncOperation(async () => {
+  async getUserOrderStats(userId, userRole, filters = {}) {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userRole }, ['userRole']);
 
       // 构建过滤条件
       const statsFilters = { ...filters };
-      
+
       // 非管理员只能查看自己的统计
       if (userRole !== 'admin' && userId) {
         statsFilters.userId = userId;
@@ -435,7 +436,7 @@ class OrderService extends BaseService {
       const stats = await orderRepo.getOrderStats(statsFilters);
 
       return this.buildResponse(stats, '获取订单统计成功');
-    }, 'getOrderStats', { userId, userRole });
+    }, 'getUserOrderStats', { userId, userRole });
   }
 
   /**
@@ -447,7 +448,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 搜索结果
    */
   async searchOrders(searchTerm, userId, userRole, options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ searchTerm, userId, userRole }, ['searchTerm', 'userId', 'userRole']);
 
       if (searchTerm.length < 2) {
@@ -479,15 +480,15 @@ class OrderService extends BaseService {
   }
 
   /**
-   * 获取订单统计信息（管理员）
+   * 获取全局订单统计信息（管理员）
    * @returns {Promise<Object>} 统计信息
    */
-  async getOrderStats() {
-    return await this.handleAsyncOperation(async () => {
+  async getAdminOrderStats() {
+    return this.handleAsyncOperation(async () => {
       const stats = await orderRepo.getGlobalStats();
 
       return this.buildResponse(stats, '获取订单统计成功');
-    }, 'getOrderStats');
+    }, 'getAdminOrderStats');
   }
 
   /**
@@ -496,7 +497,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 待处理订单列表
    */
   async getPendingOrders(options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       // 标准化分页参数
       const pagination = this.normalizePaginationParams(options);
 
@@ -528,7 +529,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 批量操作结果
    */
   async batchUpdateOrders(orderIds, operation, adminId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderIds, operation, adminId }, ['orderIds', 'operation', 'adminId']);
 
       if (!Array.isArray(orderIds) || orderIds.length === 0) {
@@ -624,7 +625,7 @@ class OrderService extends BaseService {
    * @returns {Promise<Object>} 导出结果
    */
   async exportOrders(filters = {}, format = 'csv') {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const validFormats = ['csv', 'excel'];
       if (!validFormats.includes(format)) {
         throw this.createBusinessError('不支持的导出格式');

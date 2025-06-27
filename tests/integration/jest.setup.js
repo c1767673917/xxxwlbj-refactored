@@ -10,7 +10,7 @@ const { DatabaseHelper } = require('./helpers');
 global.testDbHelper = null;
 
 // 在每个测试文件开始前执行
-beforeAll(async () => {
+beforeAll(() => {
   // 初始化数据库辅助工具
   const dbPool = getTestDbPool();
   if (dbPool) {
@@ -31,7 +31,7 @@ afterEach(async () => {
 });
 
 // 在每个测试文件结束后执行
-afterAll(async () => {
+afterAll(() => {
   // 清理全局变量
   global.testDbHelper = null;
 });

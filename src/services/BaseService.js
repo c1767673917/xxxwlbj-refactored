@@ -350,7 +350,7 @@ class BaseService {
   async executeParallel(operations, operationName = 'parallel_operations') {
     const AsyncOptimizer = require('../utils/AsyncOptimizer');
 
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const result = await AsyncOptimizer.executeParallel(operations);
 
       this.logOperation(`${operationName}_parallel_complete`, {
@@ -373,7 +373,7 @@ class BaseService {
   async executeBatch(tasks, options = {}, operationName = 'batch_operations') {
     const AsyncOptimizer = require('../utils/AsyncOptimizer');
 
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const result = await AsyncOptimizer.executeBatch(tasks, options);
 
       this.logOperation(`${operationName}_batch_complete`, {

@@ -13,14 +13,14 @@ module.exports = {
   ],
   plugins: ['node', 'jest'],
   parserOptions: {
-    ecmaVersion: 2021,
+    ecmaVersion: 2022, // 支持类字段语法
     sourceType: 'module'
   },
   rules: {
     // 代码质量规则
     'no-console': 'warn',
     'no-debugger': 'error',
-    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     'no-var': 'error',
     'prefer-const': 'error',
     'prefer-arrow-callback': 'error',
@@ -82,6 +82,19 @@ module.exports = {
       files: ['migrations/**/*.js', 'seeds/**/*.js'],
       rules: {
         'node/no-unpublished-require': 'off'
+      }
+    },
+    {
+      // 脚本文件特定规则
+      files: ['scripts/**/*.js'],
+      rules: {
+        'no-console': 'off', // 脚本文件允许console输出
+        'no-process-exit': 'off', // 脚本文件允许process.exit
+        'node/shebang': 'off', // 脚本文件不强制要求shebang
+        'max-lines': 'off', // 脚本文件可以较长
+        'max-lines-per-function': 'off', // 脚本文件函数可以较长
+        'complexity': 'off', // 脚本文件允许较高复杂度
+        'require-await': 'off' // 脚本文件的async函数可以不包含await
       }
     },
     {

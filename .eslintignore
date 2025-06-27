@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Frontend directory (has separate ESLint config)
+frontend/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# Coverage reports
+coverage/
+
+# Database files
+*.db
+*.sqlite
+
+# Environment files
+.env*
+
+# Temporary files
+.tmp/
+temp/
+
+# OS generated files
+.DS_Store
+Thumbs.db

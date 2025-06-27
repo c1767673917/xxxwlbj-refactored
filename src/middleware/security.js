@@ -21,15 +21,46 @@ const IP_WHITELIST = process.env.IP_WHITELIST
  * @returns {string} 客户端IP地址
  */
 const getClientIP = req => {
-  return (
-    req.ip ||
-    req.connection.remoteAddress ||
-    req.socket.remoteAddress ||
-    (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
-    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    req.headers['x-real-ip'] ||
-    'unknown'
-  );
+  // 优先检查代理头部（适用于负载均衡器和反向代理）
+  const xForwardedFor = req.headers['x-forwarded-for'];
+  if (xForwardedFor) {
+    // x-forwarded-for 可能包含多个IP，取第一个（客户端真实IP）
+    const ips = xForwardedFor.split(',').map(ip => ip.trim());
+    const clientIP = ips[0];
+    // 验证IP格式
+    if (clientIP && clientIP !== 'unknown' && !clientIP.includes('127.0.0.1')) {
+      return clientIP;
+    }
+  }
+
+  // 检查其他代理头部
+  const xRealIP = req.headers['x-real-ip'];
+  if (xRealIP && xRealIP !== 'unknown') {
+    return xRealIP;
+  }
+
+  // 检查Cloudflare头部
+  const cfConnectingIP = req.headers['cf-connecting-ip'];
+  if (cfConnectingIP && cfConnectingIP !== 'unknown') {
+    return cfConnectingIP;
+  }
+
+  // 最后检查Express提供的IP（已经考虑了trust proxy设置）
+  if (req.ip && req.ip !== '::1' && req.ip !== '127.0.0.1') {
+    return req.ip;
+  }
+
+  // 备用方案：直接连接的IP
+  const directIP = req.connection?.remoteAddress ||
+                   req.socket?.remoteAddress ||
+                   req.connection?.socket?.remoteAddress;
+
+  if (directIP && directIP !== '::1' && directIP !== '127.0.0.1') {
+    return directIP;
+  }
+
+  // 开发环境返回localhost，生产环境返回unknown
+  return process.env.NODE_ENV === 'development' ? '127.0.0.1' : 'unknown';
 };
 
 /**

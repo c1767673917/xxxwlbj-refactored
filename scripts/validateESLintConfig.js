@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 
 /**
  * ESLint配置验证脚本
@@ -205,7 +204,7 @@ class ESLintConfigValidator {
       });
       
       const results = JSON.parse(output.toString());
-      const hasComplexityRule = results.some(result => 
+      results.some(result =>
         result.messages.some(message => message.ruleId === 'complexity')
       );
       
@@ -235,7 +234,7 @@ class ESLintConfigValidator {
   /**
    * 检查React规则
    */
-  checkReactRules(path) {
+  checkReactRules(_path) {
     try {
       const configPath = 'frontend/.eslintrc.js';
       const config = fs.readFileSync(configPath, 'utf8');
@@ -248,7 +247,7 @@ class ESLintConfigValidator {
   /**
    * 检查TypeScript规则
    */
-  checkTypeScriptRules(path) {
+  checkTypeScriptRules(_path) {
     try {
       const configPath = 'frontend/.eslintrc.js';
       const config = fs.readFileSync(configPath, 'utf8');
@@ -261,7 +260,7 @@ class ESLintConfigValidator {
   /**
    * 检查可访问性规则
    */
-  checkA11yRules(path) {
+  checkA11yRules(_path) {
     try {
       const configPath = 'frontend/.eslintrc.js';
       const config = fs.readFileSync(configPath, 'utf8');

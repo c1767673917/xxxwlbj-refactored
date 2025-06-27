@@ -4,7 +4,6 @@
  */
 
 const request = require('supertest');
-const { TEST_CONFIG } = require('./config');
 
 describe('基础API集成测试', () => {
   let app;

@@ -4,7 +4,7 @@
  */
 
 const express = require('express');
-const { auth, validation, security } = require('../middleware');
+const { auth, validation } = require('../middleware');
 const { quoteController } = require('../controllers');
 
 const router = express.Router();

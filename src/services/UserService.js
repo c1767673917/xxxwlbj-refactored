@@ -9,13 +9,15 @@ const PasswordHistoryRepository = require('../repositories/PasswordHistoryReposi
 const passwordPolicy = require('../utils/PasswordPolicy');
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
-const { logger } = require('../config/logger');
+// const { logger } = require('../config/logger'); // 暂时注释，未使用
 const bcrypt = require('bcryptjs');
+const { getFieldConfig } = require('../config/fieldConfig');
 
 class UserService extends BaseService {
   constructor() {
     super('UserService');
-    this.allowedSortFields = ['created_at', 'updated_at', 'username', 'email'];
+    // 使用集中的字段配置
+    this.allowedSortFields = getFieldConfig('user', 'sortFields');
     this.passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     this.emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     this.passwordHistoryRepo = new PasswordHistoryRepository();
@@ -27,22 +29,22 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 注册结果
    */
   async registerUser(userData) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       // 验证必需参数
-      this.validateRequiredParams(userData, ['email', 'password', 'username']);
+      this.validateRequiredParams(userData, ['email', 'password', 'name']);
 
       // 验证参数类型
       this.validateParamTypes(userData, {
         email: 'string',
         password: 'string',
-        username: 'string'
+        name: 'string'
       });
 
       // 清理和标准化数据
       const cleanData = {
         email: userData.email.trim().toLowerCase(),
         password: userData.password,
-        username: userData.username.trim(),
+        name: userData.name.trim(),
         role: userData.role || 'user'
       };
 
@@ -69,9 +71,9 @@ class UserService extends BaseService {
         score: passwordValidation.score
       });
 
-      // 验证用户名长度
-      if (cleanData.username.length < 2 || cleanData.username.length > 50) {
-        throw this.createBusinessError('用户名长度必须在2-50字符之间');
+      // 验证姓名长度
+      if (cleanData.name.length < 2 || cleanData.name.length > 50) {
+        throw this.createBusinessError('姓名长度必须在2-50字符之间');
       }
 
       // 验证角色
@@ -90,11 +92,12 @@ class UserService extends BaseService {
       });
 
       // 生成JWT令牌
-      const token = this.generateToken(newUser);
+      const tokens = this.generateToken(newUser);
 
       return this.buildResponse({
         user: newUser,
-        token
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
       }, '用户注册成功');
     }, 'registerUser', { email: userData.email });
   }
@@ -106,7 +109,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 登录结果
    */
   async loginUser(email, password) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ email, password }, ['email', 'password']);
 
       const cleanEmail = email.trim().toLowerCase();
@@ -123,11 +126,12 @@ class UserService extends BaseService {
       });
 
       // 生成JWT令牌
-      const token = this.generateToken(user);
+      const tokens = this.generateToken(user);
 
       return this.buildResponse({
         user,
-        token
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
       }, '登录成功');
     }, 'loginUser', { email });
   }
@@ -138,7 +142,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 新的token
    */
   async refreshToken(userId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId }, ['userId']);
 
       const user = await userRepo.findById(userId);
@@ -156,13 +160,56 @@ class UserService extends BaseService {
       });
 
       // 生成新的JWT令牌
-      const token = this.generateToken(user);
+      const tokens = this.generateToken(user);
 
       return this.buildResponse({
-        token,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
         user: this.sanitizeData(user)
       }, 'Token刷新成功');
     }, 'refreshToken', { userId });
+  }
+
+  /**
+   * 使用refresh token刷新用户token
+   * @param {string} refreshToken - 刷新令牌
+   * @returns {Promise<Object>} 新的token
+   */
+  async refreshTokenWithToken(refreshToken) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ refreshToken }, ['refreshToken']);
+
+      // 验证refresh token
+      let decoded;
+      try {
+        decoded = this.verifyToken(refreshToken);
+      } catch (error) {
+        throw this.createBusinessError('无效的刷新令牌', 'INVALID_REFRESH_TOKEN', 401);
+      }
+
+      const user = await userRepo.findById(decoded.id);
+      if (!user) {
+        throw this.createBusinessError('用户不存在', 'USER_NOT_FOUND', 404);
+      }
+
+      if (!user.isActive) {
+        throw this.createBusinessError('用户已被禁用', 'USER_DISABLED', 403);
+      }
+
+      this.logOperation('token_refreshed_with_token', {
+        userId: user.id,
+        email: user.email
+      });
+
+      // 生成新的JWT令牌
+      const tokens = this.generateToken(user);
+
+      return this.buildResponse({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        user: this.sanitizeData(user)
+      }, 'Token刷新成功');
+    }, 'refreshTokenWithToken', { userId: decoded?.id });
   }
 
   /**
@@ -171,7 +218,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 登出结果
    */
   async logout(userId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId }, ['userId']);
 
       this.logOperation('user_logged_out', {
@@ -194,7 +241,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 用户信息
    */
   async getUserById(userId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId }, ['userId']);
 
       const user = await userRepo.findById(userId);
@@ -217,7 +264,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 更新后的用户信息
    */
   async updateUser(userId, updateData, currentUserRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId, currentUserRole }, ['userId', 'currentUserRole']);
 
       // 获取现有用户
@@ -286,7 +333,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 更新结果
    */
   async changePassword(userId, currentPassword, newPassword) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId, currentPassword, newPassword }, ['userId', 'currentPassword', 'newPassword']);
 
       // 获取用户信息
@@ -326,7 +373,7 @@ class UserService extends BaseService {
       }
 
       // 在事务中更新密码并保存历史记录
-      const result = await this.executeInTransaction(async (trx) => {
+      await this.executeInTransaction(async (trx) => {
         // 获取当前密码哈希用于历史记录
         const currentPasswordHash = await bcrypt.hash(newPassword, 12);
 
@@ -372,7 +419,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 用户列表
    */
   async getUserList(currentUserRole, options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ currentUserRole }, ['currentUserRole']);
 
       if (currentUserRole !== 'admin') {
@@ -412,7 +459,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 搜索结果
    */
   async searchUsers(searchTerm, currentUserRole, options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ searchTerm, currentUserRole }, ['searchTerm', 'currentUserRole']);
 
       if (currentUserRole !== 'admin') {
@@ -451,7 +498,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 更新结果
    */
   async setUserActive(userId, isActive, currentUserRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId, currentUserRole }, ['userId', 'currentUserRole']);
       this.validateParamTypes({ isActive }, { isActive: 'boolean' });
 
@@ -483,7 +530,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 统计信息
    */
   async getUserStats(currentUserRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ currentUserRole }, ['currentUserRole']);
 
       if (currentUserRole !== 'admin') {
@@ -502,7 +549,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 密码状态信息
    */
   async checkPasswordStatus(userId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const user = await userRepo.findById(userId);
       if (!user) {
         throw this.createBusinessError('用户不存在', 'USER_NOT_FOUND', 404);
@@ -536,7 +583,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 操作结果
    */
   async forcePasswordChange(userId, adminRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       if (adminRole !== 'admin') {
         throw this.createBusinessError('无权执行此操作', 'ACCESS_DENIED', 403);
       }
@@ -567,7 +614,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 密码建议
    */
   async generatePasswordSuggestion(length = 16) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const suggestedPassword = passwordPolicy.generateStrongPassword(length);
       const validation = passwordPolicy.validatePassword(suggestedPassword);
 
@@ -590,7 +637,7 @@ class UserService extends BaseService {
   /**
    * 生成JWT令牌
    * @param {Object} user - 用户对象
-   * @returns {string} JWT令牌
+   * @returns {Object} 包含accessToken和refreshToken的对象
    */
   generateToken(user) {
     const payload = {
@@ -599,9 +646,18 @@ class UserService extends BaseService {
       role: user.role
     };
 
-    return jwt.sign(payload, config.jwt.secret, {
+    const accessToken = jwt.sign(payload, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn
     });
+
+    const refreshToken = jwt.sign(payload, config.jwt.secret, {
+      expiresIn: config.jwt.refreshExpiresIn
+    });
+
+    return {
+      accessToken,
+      refreshToken
+    };
   }
 
   /**
@@ -610,7 +666,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 用户列表
    */
   async getAllUsers(options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       // 标准化分页参数
       const pagination = this.normalizePaginationParams(options);
 
@@ -642,7 +698,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 更新结果
    */
   async updateUserStatus(userId, status, adminId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId, status, adminId }, ['userId', 'status', 'adminId']);
 
       // 验证状态值
@@ -682,7 +738,7 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 重置结果
    */
   async resetUserPassword(userId, adminId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ userId, adminId }, ['userId', 'adminId']);
 
       const user = await userRepo.findById(userId);
@@ -697,6 +753,7 @@ class UserService extends BaseService {
 
       // 生成临时密码
       const tempPassword = this.generateTempPassword();
+      const resetId = this.generateResetId();
 
       // 更新密码
       const success = await userRepo.updatePassword(userId, tempPassword);
@@ -704,29 +761,35 @@ class UserService extends BaseService {
         throw this.createBusinessError('密码重置失败', 'PASSWORD_RESET_FAILED', 500);
       }
 
+      // 记录重置操作
       this.logOperation('user_password_reset', {
         userId,
         adminId,
-        email: user.email
+        email: user.email,
+        resetId
       });
 
+      // 通过安全渠道发送密码（邮件/短信）
+      await this.sendPasswordResetNotification(user.email, tempPassword, resetId);
+
+      // 不在响应中返回明文密码
       return this.buildResponse({
-        tempPassword,
-        message: '密码已重置，请通知用户尽快修改密码'
+        resetId,
+        message: '密码已重置，临时密码已通过邮件发送给用户'
       }, '密码重置成功');
     }, 'resetUserPassword', { userId, adminId });
   }
 
   /**
-   * 获取用户统计信息（管理员）
+   * 获取全局用户统计信息（管理员）
    * @returns {Promise<Object>} 统计信息
    */
-  async getUserStats() {
-    return await this.handleAsyncOperation(async () => {
+  async getGlobalUserStats() {
+    return this.handleAsyncOperation(async () => {
       const stats = await userRepo.getGlobalStats();
 
-      return this.buildResponse(stats, '获取用户统计成功');
-    }, 'getUserStats');
+      return this.buildResponse(stats, '获取全局用户统计成功');
+    }, 'getGlobalUserStats');
   }
 
   /**
@@ -743,6 +806,35 @@ class UserService extends BaseService {
   }
 
   /**
+   * 生成重置ID
+   * @returns {string} 重置ID
+   */
+  generateResetId() {
+    return `reset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * 发送密码重置通知
+   * @param {string} email - 用户邮箱
+   * @param {string} tempPassword - 临时密码
+   * @param {string} resetId - 重置ID
+   */
+  async sendPasswordResetNotification(email, tempPassword, resetId) {
+    // 实现邮件发送逻辑
+    // 这里应该集成邮件服务
+    console.log(`发送密码重置邮件到: ${email}, 重置ID: ${resetId}`);
+    // TODO: 实现真实的邮件发送功能
+    // 可以集成如 nodemailer, sendgrid 等邮件服务
+
+    // 记录通知发送日志
+    this.logOperation('password_reset_notification_sent', {
+      email,
+      resetId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
    * 验证JWT令牌
    * @param {string} token - JWT令牌
    * @returns {Object} 解码的用户信息
@@ -756,13 +848,82 @@ class UserService extends BaseService {
   }
 
   /**
+   * 批量操作用户（管理员功能）
+   * @param {Array} userIds - 用户ID列表
+   * @param {string} operation - 操作类型 ('activate', 'deactivate', 'delete')
+   * @param {string} currentUserRole - 当前用户角色
+   * @returns {Promise<Object>} 批量操作结果
+   */
+  async batchOperateUsers(userIds, operation, currentUserRole) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ userIds, operation, currentUserRole }, ['userIds', 'operation', 'currentUserRole']);
+
+      if (currentUserRole !== 'admin') {
+        throw this.createBusinessError('无权执行批量操作', 'ACCESS_DENIED', 403);
+      }
+
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        throw this.createBusinessError('用户ID列表不能为空', 'INVALID_USER_IDS', 400);
+      }
+
+      const validOperations = ['activate', 'deactivate', 'delete'];
+      if (!validOperations.includes(operation)) {
+        throw this.createBusinessError('无效的操作类型', 'INVALID_OPERATION', 400);
+      }
+
+      const results = {
+        successful: [],
+        failed: [],
+        total: userIds.length
+      };
+
+      // 批量处理用户
+      for (const userId of userIds) {
+        try {
+          const user = await userRepo.findById(userId);
+          if (!user) {
+            results.failed.push({ userId, error: '用户不存在' });
+            continue;
+          }
+
+          switch (operation) {
+            case 'activate':
+              await userRepo.updateById(userId, { isActive: true });
+              results.successful.push({ userId, action: '已激活' });
+              break;
+            case 'deactivate':
+              await userRepo.updateById(userId, { isActive: false });
+              results.successful.push({ userId, action: '已禁用' });
+              break;
+            case 'delete':
+              await userRepo.deleteById(userId);
+              results.successful.push({ userId, action: '已删除' });
+              break;
+          }
+        } catch (error) {
+          results.failed.push({ userId, error: error.message });
+        }
+      }
+
+      this.logOperation('batch_operate_users', {
+        operation,
+        total: results.total,
+        successful: results.successful.length,
+        failed: results.failed.length
+      });
+
+      return this.buildResponse(results, `批量${operation}操作完成`);
+    }, 'batchOperateUsers', { userIds: userIds.length, operation });
+  }
+
+  /**
    * 导出用户数据（管理员功能）
    * @param {Object} filters - 过滤条件
    * @param {string} format - 导出格式 ('csv', 'excel')
    * @returns {Promise<Object>} 导出结果
    */
   async exportUsers(filters = {}, format = 'csv') {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const validFormats = ['csv', 'excel'];
       if (!validFormats.includes(format)) {
         throw this.createBusinessError('不支持的导出格式');

@@ -4,7 +4,6 @@
  */
 
 const request = require('supertest');
-const { TEST_CONFIG, getAuthHeaders, getProviderHeaders } = require('./config');
 
 describe('路由映射集成测试', () => {
   let app;

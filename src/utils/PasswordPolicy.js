@@ -4,7 +4,7 @@
  */
 
 const bcrypt = require('bcryptjs');
-const { logger } = require('../config/logger');
+// const { logger } = require('../config/logger'); // 暂时注释，未使用
 
 class PasswordPolicy {
   constructor() {

@@ -9,7 +9,8 @@ const bcrypt = require('bcryptjs');
 
 class UserRepository extends BaseRepository {
   constructor() {
-    super('users', 'id');
+    // 指定用户表的布尔字段
+    super('users', 'id', ['isActive']);
   }
 
   /**
@@ -55,13 +56,13 @@ class UserRepository extends BaseRepository {
         password: hashedPassword,
         name,
         role,
-        isActive: 1
+        isActive: true
       };
 
       const createdUser = await this.create(newUser, trx);
       
       // 返回用户信息时不包含密码
-      const { password: _, ...userWithoutPassword } = createdUser;
+      const { password: _password, ...userWithoutPassword } = createdUser;
       return userWithoutPassword;
     } catch (error) {
       logger.error('创建用户失败', {
@@ -98,7 +99,7 @@ class UserRepository extends BaseRepository {
       }
 
       // 返回用户信息时不包含密码
-      const { password: _, ...userWithoutPassword } = user;
+      const { password: _password, ...userWithoutPassword } = user;
       return userWithoutPassword;
     } catch (error) {
       logger.error('验证用户失败', {
@@ -144,7 +145,7 @@ class UserRepository extends BaseRepository {
   async updateUser(userId, updateData, trx = null) {
     try {
       // 过滤掉不允许直接更新的字段
-      const { password, id, created_at, ...allowedData } = updateData;
+      const { password: _password, id: _id, created_at: _created_at, ...allowedData } = updateData;
 
       // 如果更新邮箱，需要检查是否重复
       if (allowedData.email) {
@@ -159,7 +160,7 @@ class UserRepository extends BaseRepository {
       
       if (updatedUser) {
         // 返回用户信息时不包含密码
-        const { password: _, ...userWithoutPassword } = updatedUser;
+        const { password: _password, ...userWithoutPassword } = updatedUser;
         return userWithoutPassword;
       }
 
@@ -184,11 +185,11 @@ class UserRepository extends BaseRepository {
   async setUserActive(userId, isActive, trx = null) {
     try {
       const updatedUser = await this.updateById(userId, {
-        isActive: isActive ? 1 : 0
+        isActive: isActive
       }, trx);
 
       if (updatedUser) {
-        const { password: _, ...userWithoutPassword } = updatedUser;
+        const { password: _password, ...userWithoutPassword } = updatedUser;
         return userWithoutPassword;
       }
 
@@ -221,7 +222,7 @@ class UserRepository extends BaseRepository {
 
       const conditions = { role };
       if (isActive !== null) {
-        conditions.isActive = isActive ? 1 : 0;
+        conditions.isActive = isActive;
       }
 
       const users = await this.findMany(conditions, {
@@ -257,7 +258,7 @@ class UserRepository extends BaseRepository {
         orderBy = [{ column: 'created_at', direction: 'desc' }]
       } = options;
 
-      const conditions = { isActive: 1 };
+      const conditions = { isActive: true };
       if (role) {
         conditions.role = role;
       }
@@ -305,7 +306,7 @@ class UserRepository extends BaseRepository {
       }
 
       if (isActive !== null) {
-        query = query.where('isActive', isActive ? 1 : 0);
+        query = query.where('isActive', isActive);
       }
 
       return await query
@@ -344,7 +345,7 @@ class UserRepository extends BaseRepository {
       stats.forEach(stat => {
         const count = parseInt(stat.count, 10);
         result.total += count;
-        
+
         if (stat.isActive) {
           result.active += count;
         } else {
@@ -354,7 +355,7 @@ class UserRepository extends BaseRepository {
         if (!result.byRole[stat.role]) {
           result.byRole[stat.role] = { active: 0, inactive: 0, total: 0 };
         }
-        
+
         if (stat.isActive) {
           result.byRole[stat.role].active += count;
         } else {
@@ -366,6 +367,42 @@ class UserRepository extends BaseRepository {
       return result;
     } catch (error) {
       logger.error('获取用户统计信息失败', {
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 获取全局用户统计信息（更详细的统计）
+   * @param {Object} trx - 可选的事务对象
+   * @returns {Promise<Object>} 全局统计信息
+   */
+  async getGlobalStats(trx = null) {
+    try {
+      // 获取基础统计
+      const basicStats = await this.getUserStats(trx);
+
+      // 获取最近注册用户统计
+      const recentRegistrations = await this.query(trx)
+        .where('created_at', '>=', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) // 最近30天
+        .count('* as count')
+        .first();
+
+      // 获取最近活跃用户统计
+      const recentActiveUsers = await this.query(trx)
+        .where('last_login_at', '>=', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) // 最近7天
+        .count('* as count')
+        .first();
+
+      return {
+        ...basicStats,
+        recentRegistrations: parseInt(recentRegistrations?.count || 0, 10),
+        recentActiveUsers: parseInt(recentActiveUsers?.count || 0, 10),
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error('获取全局用户统计信息失败', {
         error: error.message
       });
       throw error;

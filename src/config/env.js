@@ -11,15 +11,6 @@ if (process.env.NODE_ENV === 'test') {
   }
 }
 
-// 环境变量验证
-const requiredEnvVars = ['JWT_SECRET'];
-
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    throw new Error(`缺少必需的环境变量: ${envVar}`);
-  }
-}
-
 const config = {
   // 应用配置
   app: {
@@ -37,7 +28,18 @@ const config = {
 
   // JWT配置
   jwt: {
-    secret: process.env.JWT_SECRET,
+    get secret() {
+      if (process.env.JWT_SECRET) {
+        return process.env.JWT_SECRET;
+      }
+
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET must be set in production environment');
+      }
+
+      console.warn('⚠️  Using development JWT secret. Set JWT_SECRET in production!');
+      return process.env.JWT_SECRET || 'dev-only-secret-fixed-key-for-development';
+    },
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
@@ -98,6 +100,44 @@ if (config.app.env === 'development') {
 // 生产环境特殊配置
 if (config.app.env === 'production') {
   config.security.rateLimitMaxRequests = 50; // 生产环境更严格的限制
+}
+
+// 配置验证函数
+config.validate = () => {
+  const errors = [];
+
+  // JWT密钥安全验证
+  if (config.jwt.secret.includes('default') || config.jwt.secret.includes('change')) {
+    errors.push('JWT_SECRET contains default values, must be changed');
+  }
+  if (config.jwt.secret.length < 32) {
+    errors.push('JWT_SECRET must be at least 32 characters long');
+  }
+
+  // 生产环境必需配置验证
+  if (config.app.env === 'production') {
+    if (!process.env.JWT_SECRET) {
+      errors.push('JWT_SECRET environment variable is required in production');
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error('Configuration validation failed:\n' + errors.join('\n'));
+  }
+
+  return true;
+};
+
+// 开发环境和生产环境都进行基本验证
+if (config.app.env !== 'test') {
+  try {
+    config.validate();
+  } catch (error) {
+    console.error('❌ Configuration Error:', error.message);
+    if (config.app.env === 'production') {
+      process.exit(1);
+    }
+  }
 }
 
 module.exports = config;

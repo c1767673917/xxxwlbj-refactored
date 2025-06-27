@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 
 /**
  * 综合代码质量检查脚本
@@ -146,9 +145,17 @@ class QualityChecker {
     console.log('🧪 运行测试检查...');
 
     try {
-      // 运行测试
-      const testResult = this.runCommand('npm test -- --passWithNoTests --coverage --coverageReporters=json-summary');
-      
+      // 检查测试文件是否存在
+      const testFiles = this.findTestFiles();
+      if (testFiles.length === 0) {
+        throw new Error('未找到任何测试文件，请检查测试配置');
+      }
+
+      console.log(`  📁 找到 ${testFiles.length} 个测试文件`);
+
+      // 运行测试（移除危险的 --passWithNoTests 参数）
+      this.runCommand('npm test -- --coverage --coverageReporters=json-summary');
+
       // 读取覆盖率报告
       const coveragePath = path.join(this.projectRoot, 'coverage/coverage-summary.json');
       if (fs.existsSync(coveragePath)) {
@@ -200,7 +207,7 @@ class QualityChecker {
       try {
         const auditResult = error.stdout || '';
         if (auditResult) {
-          const audit = JSON.parse(auditResult);
+          JSON.parse(auditResult);
           // 处理审计结果...
         }
       } catch (parseError) {
@@ -305,6 +312,78 @@ class QualityChecker {
     if (this.results.dependencies.outdated.length > 0) {
       console.log(`  过时依赖: ${this.results.dependencies.outdated.length}`);
     }
+  }
+
+  /**
+   * 查找测试文件
+   */
+  findTestFiles() {
+    const testFiles = [];
+    const testDirs = ['tests', 'test', '__tests__'];
+    const testPatterns = [
+      /\.test\.(js|ts|jsx|tsx)$/,
+      /\.spec\.(js|ts|jsx|tsx)$/
+    ];
+
+    // 检查测试目录
+    for (const dir of testDirs) {
+      const testDir = path.join(this.projectRoot, dir);
+      if (fs.existsSync(testDir)) {
+        const files = this.getAllFiles(testDir);
+        testFiles.push(...files.filter(file =>
+          testPatterns.some(pattern => pattern.test(file))
+        ));
+      }
+    }
+
+    // 检查源码目录中的测试文件
+    const srcDir = path.join(this.projectRoot, 'src');
+    if (fs.existsSync(srcDir)) {
+      const files = this.getAllFiles(srcDir);
+      testFiles.push(...files.filter(file =>
+        testPatterns.some(pattern => pattern.test(file))
+      ));
+    }
+
+    // 检查前端测试文件
+    const frontendDir = path.join(this.projectRoot, 'frontend');
+    if (fs.existsSync(frontendDir)) {
+      const files = this.getAllFiles(frontendDir);
+      testFiles.push(...files.filter(file =>
+        testPatterns.some(pattern => pattern.test(file))
+      ));
+    }
+
+    return testFiles;
+  }
+
+  /**
+   * 递归获取目录下所有文件
+   */
+  getAllFiles(dir) {
+    const files = [];
+
+    try {
+      const items = fs.readdirSync(dir);
+
+      for (const item of items) {
+        const fullPath = path.join(dir, item);
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory()) {
+          // 跳过 node_modules 和其他不需要的目录
+          if (!['node_modules', '.git', 'dist', 'build', 'coverage'].includes(item)) {
+            files.push(...this.getAllFiles(fullPath));
+          }
+        } else {
+          files.push(fullPath);
+        }
+      }
+    } catch (error) {
+      // 忽略无法访问的目录
+    }
+
+    return files;
   }
 }
 

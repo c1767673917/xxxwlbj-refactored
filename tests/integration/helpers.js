@@ -4,7 +4,7 @@
  */
 
 const request = require('supertest');
-const { TEST_CONFIG, getApiUrl, getAuthHeaders, getProviderHeaders } = require('./config');
+const { TEST_CONFIG, getAuthHeaders, getProviderHeaders } = require('./config');
 
 /**
  * API请求辅助类
@@ -18,7 +18,7 @@ class ApiHelper {
   /**
    * 发送认证请求
    */
-  async authenticatedRequest(method, endpoint, data = null, userKey = 'user1') {
+  authenticatedRequest(method, endpoint, data = null, userKey = 'user1') {
     const headers = getAuthHeaders(userKey);
     let req = this.agent[method.toLowerCase()](endpoint);
     
@@ -38,7 +38,7 @@ class ApiHelper {
   /**
    * 发送供应商认证请求
    */
-  async providerRequest(method, endpoint, data = null, provider = 'Test Provider A', accessKey = 'test-access-key') {
+  providerRequest(method, endpoint, data = null, provider = 'Test Provider A', accessKey = 'test-access-key') {
     const headers = getProviderHeaders(provider, accessKey);
     let req = this.agent[method.toLowerCase()](endpoint);
     

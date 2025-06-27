@@ -37,9 +37,9 @@ const validateUserRegistration = [
     .withMessage('密码长度至少8位')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
     .withMessage('密码必须包含大小写字母、数字和特殊字符'),
-  body('username')
+  body('name')
     .isLength({ min: 2, max: 50 })
-    .withMessage('用户名长度必须在2-50字符之间')
+    .withMessage('姓名长度必须在2-50字符之间')
     .trim(),
   handleValidationErrors
 ];
@@ -189,6 +189,18 @@ const validateSorting = [
 ];
 
 /**
+ * 刷新令牌验证规则
+ */
+const validateRefreshToken = [
+  body('refreshToken')
+    .notEmpty()
+    .withMessage('刷新令牌不能为空')
+    .isJWT()
+    .withMessage('刷新令牌格式无效'),
+  handleValidationErrors
+];
+
+/**
  * 通用字段长度验证
  * @param {string} field - 字段名
  * @param {number} min - 最小长度
@@ -208,6 +220,7 @@ module.exports = {
   validateUserRegistration,
   validateUserLogin,
   validatePasswordChange,
+  validateRefreshToken,
   validateOrderCreation,
   validateOrderId,
   validateQuoteSubmission,

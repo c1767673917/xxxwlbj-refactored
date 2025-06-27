@@ -8,6 +8,7 @@ const authRoutes = require('./auth');
 const orderRoutes = require('./orders');
 const quoteRoutes = require('./quotes');
 const userRoutes = require('./users');
+const adminRoutes = require('./admin');
 
 const router = express.Router();
 
@@ -22,5 +23,8 @@ router.use('/quotes', quoteRoutes);
 
 // 用户相关路由
 router.use('/users', userRoutes);
+
+// 管理员相关路由
+router.use('/admin', adminRoutes);
 
 module.exports = router;

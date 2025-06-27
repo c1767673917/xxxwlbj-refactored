@@ -4,12 +4,11 @@
  */
 
 const request = require('supertest');
-const { TEST_CONFIG, getAuthHeaders, getProviderHeaders, generateTestData } = require('./config');
+const { TEST_CONFIG, generateTestData } = require('./config');
 const { ApiHelper, DatabaseHelper, ResponseValidator } = require('./helpers');
 
 describe('报价管理流程集成测试', () => {
   let app;
-  let apiHelper;
   let dbHelper;
   let responseValidator;
   let testUser, adminUser;

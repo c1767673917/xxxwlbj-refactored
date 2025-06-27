@@ -5,7 +5,6 @@
 
 const BaseService = require('./BaseService');
 const { quoteRepo, orderRepo, providerRepo } = require('../repositories');
-const { logger } = require('../config/logger');
 
 class QuoteService extends BaseService {
   constructor() {
@@ -22,7 +21,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 创建或更新的报价
    */
   async createOrUpdateQuote(orderId, provider, quoteData, accessKey) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       // 验证必需参数
       this.validateRequiredParams({ orderId, provider, accessKey }, ['orderId', 'provider', 'accessKey']);
       this.validateRequiredParams(quoteData, ['price', 'estimatedDelivery']);
@@ -100,7 +99,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 报价列表
    */
   async getOrderQuotes(orderId, options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId }, ['orderId']);
 
       // 验证订单是否存在
@@ -149,7 +148,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 报价历史
    */
   async getProviderQuotes(provider, accessKey, options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ provider, accessKey }, ['provider', 'accessKey']);
 
       // 验证供应商访问权限
@@ -200,7 +199,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 报价详情
    */
   async getQuoteById(quoteId, userId, userRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ quoteId, userId, userRole }, ['quoteId', 'userId', 'userRole']);
 
       const quote = await quoteRepo.findById(quoteId);
@@ -228,7 +227,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 选择结果
    */
   async selectQuote(quoteId, userId, userRole) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ quoteId, userId, userRole }, ['quoteId', 'userId', 'userRole']);
 
       const quote = await quoteRepo.findById(quoteId);
@@ -276,7 +275,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 更新结果
    */
   async updateQuote(quoteId, updateData, provider, accessKey) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ quoteId, provider, accessKey }, ['quoteId', 'provider', 'accessKey']);
 
       // 验证供应商访问权限
@@ -331,7 +330,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 撤回结果
    */
   async withdrawQuote(quoteId, provider, accessKey) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ quoteId, provider, accessKey }, ['quoteId', 'provider', 'accessKey']);
 
       // 验证供应商访问权限
@@ -377,7 +376,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 报价列表
    */
   async getAllQuotes(options = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       // 标准化分页参数
       const pagination = this.normalizePaginationParams(options);
 
@@ -408,7 +407,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 统计信息
    */
   async getQuoteStats() {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const stats = await quoteRepo.getGlobalStats();
 
       return this.buildResponse(stats, '获取报价统计成功');
@@ -423,7 +422,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 删除结果
    */
   async deleteQuote(orderId, provider, accessKey) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId, provider, accessKey }, ['orderId', 'provider', 'accessKey']);
 
       // 验证供应商访问权限
@@ -467,7 +466,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 最低报价信息
    */
   async getLowestQuote(orderId) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId }, ['orderId']);
 
       // 验证订单是否存在
@@ -490,7 +489,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 价格范围内的报价
    */
   async getQuotesByPriceRange(orderId, minPrice, maxPrice) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderId, minPrice, maxPrice }, ['orderId', 'minPrice', 'maxPrice']);
       this.validateParamTypes({ minPrice, maxPrice }, { minPrice: 'number', maxPrice: 'number' });
 
@@ -523,7 +522,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 报价统计信息
    */
   async getQuoteStatsAdmin(filters = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const {
         startDate = null,
         endDate = null,
@@ -577,7 +576,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 导出结果
    */
   async exportQuotes(filters = {}, format = 'csv') {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       const validFormats = ['csv', 'excel'];
       if (!validFormats.includes(format)) {
         throw this.createBusinessError('不支持的导出格式');
@@ -626,7 +625,7 @@ class QuoteService extends BaseService {
    * @returns {Promise<Object>} 批量报价结果
    */
   async getBatchQuotes(orderIds) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ orderIds }, ['orderIds']);
 
       if (!Array.isArray(orderIds) || orderIds.length === 0) {

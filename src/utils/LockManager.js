@@ -232,7 +232,7 @@ class LockManager {
    * @param {string} lockId - 锁ID
    * @returns {boolean} 是否检测到死锁
    */
-  detectDeadlock(key, lockId) {
+  detectDeadlock(key, _lockId) {
     // 简单的死锁检测：如果同一个调用者尝试获取已持有的锁
     const existingLock = this.locks.get(key);
     if (!existingLock) {

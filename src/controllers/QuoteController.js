@@ -5,12 +5,14 @@
 
 const BaseController = require('./BaseController');
 const { quoteService } = require('../services');
+const { getFieldConfig } = require('../config/fieldConfig');
 
 class QuoteController extends BaseController {
   constructor() {
     super('QuoteController');
-    this.allowedSortFields = ['price', 'createdAt', 'estimatedDelivery'];
-    this.allowedFilterFields = ['startDate', 'endDate'];
+    // 使用集中的字段配置
+    this.allowedSortFields = getFieldConfig('quote', 'sortFields');
+    this.allowedFilterFields = getFieldConfig('quote', 'filterFields');
   }
 
   /**
@@ -19,7 +21,8 @@ class QuoteController extends BaseController {
    */
   createOrUpdateQuote = this.asyncHandler(async (req, res) => {
     const { orderId } = this.validatePathParams(req, ['orderId']);
-    const quoteData = this.validateRequestBody(req, ['price', 'estimatedDelivery']);
+    const requiredFields = getFieldConfig('quote', 'requiredFields');
+    const quoteData = this.validateRequestBody(req, requiredFields);
 
     // 从请求头获取供应商信息
     const provider = req.headers['x-provider-name'];
@@ -190,6 +193,7 @@ class QuoteController extends BaseController {
    */
   getQuoteStats = this.asyncHandler(async (req, res) => {
     const user = this.getCurrentUser(req);
+    this.checkUserRole(req, 'admin');
 
     this.logOperation('get_quote_stats_request', req, {
       userId: user.id
@@ -326,8 +330,8 @@ class QuoteController extends BaseController {
       return this.sendError(res, '订单ID列表不能为空', 400, 'EMPTY_ORDER_IDS');
     }
 
-    if (orderIds.length > 100) {
-      return this.sendError(res, '一次最多查询100个订单的报价', 400, 'TOO_MANY_ORDERS');
+    if (orderIds.length > 50) {
+      return this.sendError(res, '一次最多查询50个订单的报价', 400, 'TOO_MANY_ORDERS');
     }
 
     this.logOperation('get_batch_quotes_request', req, {
@@ -347,7 +351,7 @@ class QuoteController extends BaseController {
    */
   getQuoteStatsAdmin = this.asyncHandler(async (req, res) => {
     const user = this.getCurrentUser(req);
-    this.checkUserRole(req, 'admin');
+    // 权限检查已在路由层完成 (auth.requireAdmin)
 
     // 提取过滤参数
     const filters = this.extractFilterParams(req, ['startDate', 'endDate', 'provider']);
@@ -371,7 +375,8 @@ class QuoteController extends BaseController {
     this.checkUserRole(req, 'admin');
 
     // 提取过滤参数
-    const filters = this.extractFilterParams(req, ['startDate', 'endDate', 'provider', 'orderId']);
+    const exportFilterFields = getFieldConfig('quote', 'exportFilterFields');
+    const filters = this.extractFilterParams(req, exportFilterFields);
     const format = req.query.format || 'csv';
 
     this.logOperation('export_quotes_request', req, {

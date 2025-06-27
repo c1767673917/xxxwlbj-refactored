@@ -22,7 +22,6 @@ jest.mock('../../../src/config/logger', () => ({
 
 jest.mock('node-fetch', () => jest.fn());
 
-const { providerRepo } = require('../../../src/repositories');
 const AsyncOptimizer = require('../../../src/utils/AsyncOptimizer');
 const fetch = require('node-fetch');
 

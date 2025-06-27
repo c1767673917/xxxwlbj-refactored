@@ -5,12 +5,20 @@
 
 const { db, transactionManager } = require('../config/database');
 const { logger } = require('../config/logger');
+const {
+  convertBooleanFieldsToSQLite,
+  convertBooleanFieldsFromSQLite,
+  convertArrayBooleanFieldsFromSQLite,
+  COMMON_BOOLEAN_FIELDS
+} = require('../utils/dataTypeConverter');
 
 class BaseRepository {
-  constructor(tableName, primaryKey = 'id') {
+  constructor(tableName, primaryKey = 'id', booleanFields = []) {
     this.tableName = tableName;
     this.primaryKey = primaryKey;
     this.db = db;
+    // 合并通用布尔字段和自定义布尔字段
+    this.booleanFields = [...new Set([...COMMON_BOOLEAN_FIELDS, ...booleanFields])];
   }
 
   /**
@@ -33,8 +41,13 @@ class BaseRepository {
       const result = await this.query(trx)
         .where(this.primaryKey, id)
         .first();
-      
-      return result || null;
+
+      if (!result) {
+        return null;
+      }
+
+      // 转换布尔字段
+      return convertBooleanFieldsFromSQLite(result, this.booleanFields);
     } catch (error) {
       logger.error('根据ID查找记录失败', {
         table: this.tableName,
@@ -56,8 +69,13 @@ class BaseRepository {
       const result = await this.query(trx)
         .where(conditions)
         .first();
-      
-      return result || null;
+
+      if (!result) {
+        return null;
+      }
+
+      // 转换布尔字段
+      return convertBooleanFieldsFromSQLite(result, this.booleanFields);
     } catch (error) {
       logger.error('根据条件查找记录失败', {
         table: this.tableName,
@@ -112,7 +130,10 @@ class BaseRepository {
         query = query.offset(offset);
       }
 
-      return await query;
+      const results = await query;
+
+      // 转换布尔字段
+      return convertArrayBooleanFieldsFromSQLite(results, this.booleanFields);
     } catch (error) {
       logger.error('根据条件查找多条记录失败', {
         table: this.tableName,
@@ -131,7 +152,7 @@ class BaseRepository {
    * @returns {Promise<Array>} 记录数组
    */
   async findAll(options = {}, trx = null) {
-    return await this.findMany({}, options, trx);
+    return this.findMany({}, options, trx);
   }
 
   /**
@@ -143,8 +164,12 @@ class BaseRepository {
   async create(data, trx = null) {
     try {
       const now = new Date().toISOString();
+
+      // 转换布尔字段为SQLite格式
+      const convertedData = convertBooleanFieldsToSQLite(data, this.booleanFields);
+
       const dataWithTimestamps = {
-        ...data,
+        ...convertedData,
         created_at: now,
         updated_at: now
       };
@@ -174,11 +199,16 @@ class BaseRepository {
   async createMany(dataArray, trx = null) {
     try {
       const now = new Date().toISOString();
-      const dataWithTimestamps = dataArray.map(data => ({
-        ...data,
-        created_at: now,
-        updated_at: now
-      }));
+
+      // 转换布尔字段为SQLite格式
+      const dataWithTimestamps = dataArray.map(data => {
+        const convertedData = convertBooleanFieldsToSQLite(data, this.booleanFields);
+        return {
+          ...convertedData,
+          created_at: now,
+          updated_at: now
+        };
+      });
 
       const ids = await this.query(trx)
         .insert(dataWithTimestamps)
@@ -204,8 +234,11 @@ class BaseRepository {
    */
   async updateById(id, data, trx = null) {
     try {
+      // 转换布尔字段为SQLite格式
+      const convertedData = convertBooleanFieldsToSQLite(data, this.booleanFields);
+
       const dataWithTimestamp = {
-        ...data,
+        ...convertedData,
         updated_at: new Date().toISOString()
       };
 
@@ -238,8 +271,11 @@ class BaseRepository {
    */
   async updateMany(conditions, data, trx = null) {
     try {
+      // 转换布尔字段为SQLite格式
+      const convertedData = convertBooleanFieldsToSQLite(data, this.booleanFields);
+
       const dataWithTimestamp = {
-        ...data,
+        ...convertedData,
         updated_at: new Date().toISOString()
       };
 
@@ -355,7 +391,7 @@ class BaseRepository {
    * @returns {Promise<any>} 事务结果
    */
   async transaction(callback) {
-    return await transactionManager.executeTransaction(callback);
+    return transactionManager.executeTransaction(callback);
   }
 
   /**
@@ -365,7 +401,7 @@ class BaseRepository {
    * @returns {Promise<any>} 事务结果
    */
   async transactionWithRetry(callback, maxRetries = 3) {
-    return await transactionManager.executeWithRetry(callback, maxRetries);
+    return transactionManager.executeWithRetry(callback, maxRetries);
   }
 }
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 
 /**
  * 代码格式化验证脚本
@@ -271,7 +270,7 @@ class FormattingValidator {
   /**
    * 检查格式化规则
    */
-  checkFormattingRules(path) {
+  checkFormattingRules(_path) {
     // 简化检查：验证配置文件包含基本规则
     try {
       const config = JSON.parse(fs.readFileSync('.prettierrc.json', 'utf8'));
@@ -284,7 +283,7 @@ class FormattingValidator {
   /**
    * 检查JSX格式化
    */
-  checkJSXFormatting(path) {
+  checkJSXFormatting(_path) {
     try {
       const config = JSON.parse(fs.readFileSync('frontend/.prettierrc.json', 'utf8'));
       return config.jsxSingleQuote !== undefined;
@@ -296,7 +295,7 @@ class FormattingValidator {
   /**
    * 检查TypeScript格式化
    */
-  checkTypeScriptFormatting(path) {
+  checkTypeScriptFormatting(_path) {
     try {
       const config = JSON.parse(fs.readFileSync('frontend/.prettierrc.json', 'utf8'));
       const tsOverride = config.overrides?.find(override => 
@@ -311,7 +310,7 @@ class FormattingValidator {
   /**
    * 检查样式文件格式化
    */
-  checkStyleFormatting(path) {
+  checkStyleFormatting(_path) {
     try {
       const config = JSON.parse(fs.readFileSync('frontend/.prettierrc.json', 'utf8'));
       const cssOverride = config.overrides?.find(override => 

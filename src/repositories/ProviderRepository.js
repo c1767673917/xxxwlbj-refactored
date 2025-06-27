@@ -97,7 +97,7 @@ class ProviderRepository extends BaseRepository {
   async updateProvider(providerId, updateData, trx = null) {
     try {
       // 过滤掉不允许直接更新的字段
-      const { id, created_at, ...allowedData } = updateData;
+      const { id: _id, created_at: _created_at, ...allowedData } = updateData;
 
       // 如果更新名称，需要检查是否重复
       if (allowedData.name) {

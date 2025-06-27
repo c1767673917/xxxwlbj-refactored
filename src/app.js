@@ -9,6 +9,20 @@ const { logger } = require('./config/logger');
 const config = require('./config/env');
 const { security, errorHandler, initializeErrorHandling } = require('./middleware');
 const routes = require('./routes');
+const ConfigValidator = require('./utils/configValidator');
+
+// 验证配置
+const configValidator = new ConfigValidator();
+const validationResult = configValidator.validate(config);
+
+if (!validationResult.isValid) {
+  logger.error('配置验证失败，应用无法启动', { errors: validationResult.errors });
+  process.exit(1);
+}
+
+if (validationResult.warnings.length > 0) {
+  logger.warn('配置验证警告', { warnings: validationResult.warnings });
+}
 
 // 初始化全局错误处理
 initializeErrorHandling();
@@ -78,12 +92,14 @@ if (process.env.NODE_ENV !== 'test') {
 
     server.close(() => {
       logger.info('HTTP服务器已关闭');
+      // eslint-disable-next-line no-process-exit
       process.exit(0);
     });
 
     // 强制关闭超时
     setTimeout(() => {
       logger.error('强制关闭服务器');
+      // eslint-disable-next-line no-process-exit
       process.exit(1);
     }, 10000);
   };

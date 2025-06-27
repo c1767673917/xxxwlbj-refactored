@@ -14,7 +14,10 @@ jest.mock('../../../src/services', () => ({
     deleteQuote: jest.fn(),
     getLowestQuote: jest.fn(),
     getQuotesByPriceRange: jest.fn(),
-    getBatchQuotes: jest.fn()
+    getBatchQuotes: jest.fn(),
+    getQuoteStats: jest.fn(),
+    getQuoteStatsAdmin: jest.fn(),
+    exportQuotes: jest.fn()
   }
 }));
 
@@ -697,6 +700,25 @@ describe('QuoteController', () => {
       const orderIds = ['ORD-20250625-001', 'ORD-20250625-002'];
       mockReq.body = { orderIds };
 
+      // Mock 服务返回值
+      const mockResult = {
+        data: [
+          {
+            orderId: 'ORD-20250625-001',
+            quotes: [],
+            stats: { count: 0, minPrice: 0, maxPrice: 0, avgPrice: 0 }
+          },
+          {
+            orderId: 'ORD-20250625-002',
+            quotes: [],
+            stats: { count: 0, minPrice: 0, maxPrice: 0, avgPrice: 0 }
+          }
+        ],
+        message: '批量获取报价完成',
+        meta: { timestamp: new Date().toISOString() }
+      };
+      quoteService.getBatchQuotes.mockResolvedValue(mockResult);
+
       // 执行测试
       await quoteController.getBatchQuotes(mockReq, mockRes, mockNext);
 
@@ -812,6 +834,32 @@ describe('QuoteController', () => {
         provider: 'Test Provider'
       };
 
+      // Mock 服务返回值
+      const mockResult = {
+        data: {
+          totalQuotes: 150,
+          totalOrders: 50,
+          averageQuotesPerOrder: 3,
+          priceStats: {
+            min: 100,
+            max: 1000,
+            avg: 500,
+            median: 450
+          },
+          providerStats: [
+            { provider: 'Provider A', count: 75, avgPrice: 480 },
+            { provider: 'Provider B', count: 75, avgPrice: 520 }
+          ],
+          timeSeriesData: [
+            { date: '2025-06-01', count: 10, avgPrice: 500 },
+            { date: '2025-06-02', count: 12, avgPrice: 510 }
+          ]
+        },
+        message: '获取报价统计成功',
+        meta: { timestamp: new Date().toISOString() }
+      };
+      quoteService.getQuoteStats.mockResolvedValue(mockResult);
+
       // 执行测试
       await quoteController.getQuoteStats(mockReq, mockRes, mockNext);
 
@@ -871,6 +919,20 @@ describe('QuoteController', () => {
         provider: 'Test Provider',
         orderId: 'ORD-20250625-001'
       };
+
+      // Mock 服务返回值
+      const mockResult = {
+        data: {
+          downloadUrl: '/api/downloads/quotes_export_20250627.csv',
+          fileName: 'quotes_export_20250627.csv',
+          format: 'csv',
+          recordCount: 100,
+          expiresAt: new Date(Date.now() + 3600000).toISOString()
+        },
+        message: '报价导出任务已创建',
+        meta: { timestamp: new Date().toISOString() }
+      };
+      quoteService.exportQuotes.mockResolvedValue(mockResult);
 
       // 执行测试
       await quoteController.exportQuotes(mockReq, mockRes, mockNext);

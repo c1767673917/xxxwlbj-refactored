@@ -4,7 +4,7 @@
  */
 
 const express = require('express');
-const { auth, validation, security } = require('../middleware');
+const { auth, validation } = require('../middleware');
 const { orderController } = require('../controllers');
 
 const router = express.Router();
@@ -46,35 +46,12 @@ router.delete('/:id',
   orderController.deleteOrder
 );
 
-// 管理员专用路由
-
-// 获取所有待处理订单（管理员）
-router.get('/admin/pending',
+// 获取用户订单统计信息
+router.get('/stats',
   auth.authenticateToken,
-  auth.requireAdmin,
-  validation.validatePagination,
-  orderController.getPendingOrders
+  orderController.getUserOrderStats
 );
 
-// 批量操作订单（管理员）
-router.post('/admin/batch',
-  auth.authenticateToken,
-  auth.requireAdmin,
-  orderController.batchOperateOrders
-);
-
-// 导出订单数据（管理员）
-router.get('/admin/export',
-  auth.authenticateToken,
-  auth.requireAdmin,
-  orderController.exportOrders
-);
-
-// 获取订单统计信息（管理员）
-router.get('/admin/stats',
-  auth.authenticateToken,
-  auth.requireAdmin,
-  orderController.getOrderStats
-);
+// 管理员路由已迁移到 /admin/orders
 
 module.exports = router;

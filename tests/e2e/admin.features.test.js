@@ -7,7 +7,7 @@ describe('管理员功能测试', () => {
   let client;
   let userClient, adminClient;
   let testUser, testAdmin;
-  let testData = {
+  const testData = {
     orderIds: [],
     quoteIds: [],
     userIds: []

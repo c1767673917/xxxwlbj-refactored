@@ -4,7 +4,6 @@
  */
 
 const BaseService = require('./BaseService');
-const { logger } = require('../config/logger');
 const config = require('../config/env');
 
 class NotificationService extends BaseService {
@@ -22,7 +21,7 @@ class NotificationService extends BaseService {
    * @returns {Promise<Object>} 通知发送结果
    */
   async notifyProvidersNewOrder(order, providers = []) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ order }, ['order']);
       this.validateRequiredParams(order, ['id', 'warehouse', 'goods', 'deliveryAddress']);
 
@@ -91,7 +90,7 @@ class NotificationService extends BaseService {
    * @returns {Promise<Object>} 通知发送结果
    */
   async notifyUserNewQuote(quote, order, user) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ quote, order, user }, ['quote', 'order', 'user']);
       this.validateRequiredParams(quote, ['provider', 'price', 'estimatedDelivery']);
       this.validateRequiredParams(order, ['id', 'warehouse', 'goods']);
@@ -125,7 +124,7 @@ class NotificationService extends BaseService {
    * @returns {Promise<Object>} 通知发送结果
    */
   async notifyOrderStatusChange(order, user, previousStatus) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ order, user, previousStatus }, ['order', 'user', 'previousStatus']);
       this.validateRequiredParams(order, ['id', 'status']);
       this.validateRequiredParams(user, ['id', 'name']);
@@ -160,7 +159,7 @@ class NotificationService extends BaseService {
    * @returns {Promise<Object>} 通知发送结果
    */
   async sendSystemNotification(title, content, type = 'system', metadata = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ title, content }, ['title', 'content']);
 
       const message = {
@@ -283,7 +282,7 @@ ${order.selectedPrice ? `选择价格：¥${order.selectedPrice}` : ''}
       };
     }
 
-    return await this.retry(async () => {
+    return this.retry(async () => {
       const response = await fetch(this.webhookUrl, {
         method: 'POST',
         headers: {
@@ -316,7 +315,7 @@ ${order.selectedPrice ? `选择价格：¥${order.selectedPrice}` : ''}
    * @returns {Promise<Object>} 批量发送结果
    */
   async sendBatchNotifications(notifications) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ notifications }, ['notifications']);
 
       if (!Array.isArray(notifications) || notifications.length === 0) {
@@ -350,7 +349,7 @@ ${order.selectedPrice ? `选择价格：¥${order.selectedPrice}` : ''}
       });
 
       const results = batchResult.results;
-      const errors = batchResult.errors.map((error, index) => ({
+      const errors = batchResult.errors.map((error, _index) => ({
         ...notifications[error.index],
         error: error.error,
         status: 'failed'
@@ -380,7 +379,7 @@ ${order.selectedPrice ? `选择价格：¥${order.selectedPrice}` : ''}
    * @returns {Promise<Object>} 统计信息
    */
   async getNotificationStats(filters = {}) {
-    return await this.handleAsyncOperation(async () => {
+    return this.handleAsyncOperation(async () => {
       // 这里可以从日志或数据库中获取统计信息
       // 目前返回模拟数据
       const stats = {

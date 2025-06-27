@@ -6,7 +6,7 @@
 
 const { db, transactionManager } = require('../config/database');
 const { logger } = require('../config/logger');
-const { lockManager, LOCK_KEYS } = require('./LockManager');
+const { lockManager } = require('./LockManager');
 
 class IndexManager {
   constructor() {
@@ -135,7 +135,7 @@ class IndexManager {
 
     const lockKey = 'index_creation_global';
     
-    return await lockManager.withLock(lockKey, async () => {
+    return lockManager.withLock(lockKey, async () => {
       const results = {
         created: [],
         skipped: [],
@@ -211,9 +211,9 @@ class IndexManager {
    */
   async createSingleIndex(indexDef, options = {}) {
     const { force = false, skipExisting = true } = options;
-    const { name, table, columns, unique = false, order } = indexDef;
+    const { name, table, columns, unique = false } = indexDef;
 
-    return await transactionManager.executeWithRetry(async (trx) => {
+    return transactionManager.executeWithRetry(async (trx) => {
       // 检查索引是否已存在
       if (!force && skipExisting) {
         const exists = await this.indexExists(name, trx);
@@ -307,7 +307,7 @@ class IndexManager {
   async dropIndex(indexName) {
     const lockKey = `index_drop_${indexName}`;
     
-    return await lockManager.withLock(lockKey, async () => {
+    return lockManager.withLock(lockKey, async () => {
       try {
         await db.raw(`DROP INDEX IF EXISTS ${indexName}`);
         this.createdIndexes.delete(indexName);
@@ -334,7 +334,7 @@ class IndexManager {
 
     const lockKey = `index_rebuild_${indexName}`;
     
-    return await lockManager.withLock(lockKey, async () => {
+    return lockManager.withLock(lockKey, async () => {
       try {
         // 先删除再创建
         await this.dropIndex(indexName);
@@ -392,7 +392,7 @@ class IndexManager {
       missing: []
     };
 
-    for (const [name, indexDef] of this.indexDefinitions) {
+    for (const [name, _indexDef] of this.indexDefinitions) {
       try {
         const exists = await this.indexExists(name);
         

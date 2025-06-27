@@ -38,8 +38,20 @@ router.post('/change-password',
 
 // 刷新token
 router.post('/refresh',
-  auth.authenticateToken,
+  validation.validateRefreshToken,
   userController.refreshToken
+);
+
+// 验证token有效性
+router.get('/verify',
+  auth.authenticateToken,
+  (req, res) => {
+    res.json({
+      success: true,
+      user: req.user,
+      message: 'Token有效'
+    });
+  }
 );
 
 // 登出
