@@ -38,7 +38,7 @@ class AdminUserController extends BaseController {
       options
     });
 
-    const result = await userService.getUserList(options, user.role);
+    const result = await userService.getUserList(user.role, options);
 
     this.sendSuccess(res, result.data, result.message, 200, result.meta);
   });
@@ -57,8 +57,28 @@ class AdminUserController extends BaseController {
     });
 
     const result = await userService.getUserById(userId);
-    
+
     this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
+
+  /**
+   * 创建用户（管理员功能）
+   * POST /api/admin/users
+   */
+  createUser = this.asyncHandler(async (req, res) => {
+    const currentUser = this.getCurrentUser(req);
+    const requiredFields = getFieldConfig('user', 'requiredFields');
+    const userData = this.validateRequestBody(req, requiredFields);
+
+    this.logOperation('admin_create_user_request', req, {
+      adminId: currentUser.id,
+      email: userData.email,
+      name: userData.name
+    });
+
+    const result = await userService.createUserByAdmin(userData, currentUser.role);
+
+    this.sendSuccess(res, result.data, result.message, 201, result.meta);
   });
 
   /**
@@ -85,7 +105,30 @@ class AdminUserController extends BaseController {
     });
 
     const result = await userService.updateUser(userId, updateData, currentUser.role);
-    
+
+    this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
+
+  /**
+   * 删除用户（管理员功能）
+   * DELETE /api/admin/users/:userId
+   */
+  deleteUser = this.asyncHandler(async (req, res) => {
+    const currentUser = this.getCurrentUser(req);
+    const { userId } = this.validatePathParams(req, ['userId']);
+
+    // 防止管理员删除自己
+    if (userId === currentUser.id) {
+      return this.sendError(res, '不能删除自己的账户', 400, 'CANNOT_DELETE_SELF');
+    }
+
+    this.logOperation('admin_delete_user_request', req, {
+      adminId: currentUser.id,
+      targetUserId: userId
+    });
+
+    const result = await userService.deleteUserByAdmin(userId, currentUser.role);
+
     this.sendSuccess(res, result.data, result.message, 200, result.meta);
   });
 

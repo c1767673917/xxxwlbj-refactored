@@ -23,6 +23,13 @@ router.post('/login',
   userController.login
 );
 
+// 供应商登录
+router.post('/login/provider',
+  security.authRateLimit,
+  validation.validateProviderLogin,
+  userController.loginProvider
+);
+
 // 获取当前用户信息
 router.get('/me',
   auth.authenticateToken,

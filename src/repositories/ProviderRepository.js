@@ -321,6 +321,78 @@ class ProviderRepository extends BaseRepository {
       throw error;
     }
   }
+
+  /**
+   * 分页查找供应商
+   * @param {Object} options - 查询选项
+   * @param {Object} trx - 可选的事务对象
+   * @returns {Promise<Object>} 分页结果
+   */
+  async findWithPagination(options = {}, trx = null) {
+    try {
+      const {
+        page = 1,
+        pageSize = 20,
+        orderBy = [{ column: 'createdAt', order: 'desc' }],
+        status = null,
+        search = null
+      } = options;
+
+      let query = this.db(this.tableName);
+
+      if (trx) {
+        query = query.transacting(trx);
+      }
+
+      // 添加过滤条件
+      if (status) {
+        query = query.where('status', status);
+      }
+      if (search) {
+        query = query.where('name', 'like', `%${search}%`);
+      }
+
+      // 获取总数
+      const countQuery = query.clone().count('id as count');
+      const [{ count }] = await countQuery;
+      const total = parseInt(count);
+
+      // 应用排序
+      if (Array.isArray(orderBy)) {
+        orderBy.forEach(sort => {
+          query = query.orderBy(sort.column, sort.order || 'asc');
+        });
+      }
+
+      // 应用分页
+      const offset = (page - 1) * pageSize;
+      query = query.limit(pageSize).offset(offset);
+
+      const providers = await query;
+
+      // 移除敏感信息
+      const safeProviders = providers.map(provider => {
+        const { api_key_hash, ...safeProvider } = provider;
+        return safeProvider;
+      });
+
+      return {
+        data: safeProviders,
+        meta: {
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize)
+        }
+      };
+    } catch (error) {
+      logger.error('分页查找供应商失败', {
+        options,
+        error: error.message
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = ProviderRepository;

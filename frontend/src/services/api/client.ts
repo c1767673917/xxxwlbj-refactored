@@ -39,24 +39,33 @@ class HttpClient {
   // 加载存储的token
   private loadToken(): void {
     try {
+      // 首先尝试普通用户token，然后尝试管理员token
       this.token = localStorage.getItem('wlbj_access_token');
+      if (!this.token) {
+        this.token = localStorage.getItem('wlbj_admin_access_token');
+      }
     } catch (error) {
       logger.warn('Failed to load token from localStorage:', error);
     }
   }
 
   // 设置token
-  setToken(token: string | null): void {
+  setToken(token: string | null, isAdmin: boolean = false): void {
     this.token = token;
     if (token) {
       try {
-        localStorage.setItem('wlbj_access_token', token);
+        if (isAdmin) {
+          localStorage.setItem('wlbj_admin_access_token', token);
+        } else {
+          localStorage.setItem('wlbj_access_token', token);
+        }
       } catch (error) {
         logger.warn('Failed to save token to localStorage:', error);
       }
     } else {
       try {
         localStorage.removeItem('wlbj_access_token');
+        localStorage.removeItem('wlbj_admin_access_token');
       } catch (error) {
         logger.warn('Failed to remove token from localStorage:', error);
       }
@@ -81,12 +90,20 @@ class HttpClient {
       return this.refreshPromise;
     }
 
-    const refreshToken = localStorage.getItem('wlbj_refresh_token');
+    // 首先尝试普通用户的刷新token，然后尝试管理员的
+    let refreshToken = localStorage.getItem('wlbj_refresh_token');
+    let isAdmin = false;
+
+    if (!refreshToken) {
+      refreshToken = localStorage.getItem('wlbj_admin_refresh_token');
+      isAdmin = true;
+    }
+
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }
 
-    this.refreshPromise = this.performTokenRefresh(refreshToken);
+    this.refreshPromise = this.performTokenRefresh(refreshToken, isAdmin);
 
     try {
       await this.refreshPromise;
@@ -96,7 +113,7 @@ class HttpClient {
   }
 
   // 执行Token刷新
-  private async performTokenRefresh(refreshToken: string): Promise<void> {
+  private async performTokenRefresh(refreshToken: string, isAdmin: boolean = false): Promise<void> {
     try {
       logger.info('Attempting to refresh token via HTTP client');
 
@@ -115,8 +132,14 @@ class HttpClient {
         const { accessToken, refreshToken: newRefreshToken } = response.data;
 
         // 更新Token
-        this.setToken(accessToken);
-        localStorage.setItem('wlbj_refresh_token', newRefreshToken);
+        this.setToken(accessToken, isAdmin);
+
+        // 根据用户类型保存刷新token
+        if (isAdmin) {
+          localStorage.setItem('wlbj_admin_refresh_token', newRefreshToken);
+        } else {
+          localStorage.setItem('wlbj_refresh_token', newRefreshToken);
+        }
 
         logger.info('Token refreshed successfully via HTTP client');
       } else {
@@ -127,7 +150,11 @@ class HttpClient {
 
       // 清除无效的Token
       this.setToken(null);
-      localStorage.removeItem('wlbj_refresh_token');
+      if (isAdmin) {
+        localStorage.removeItem('wlbj_admin_refresh_token');
+      } else {
+        localStorage.removeItem('wlbj_refresh_token');
+      }
 
       throw error;
     }

@@ -12,8 +12,9 @@ export const apiConfig = {
 // 公共端点（不需要认证）
 export const PUBLIC_ENDPOINTS = [
   '/auth/login',
-  '/auth/login/provider', 
+  '/auth/login/provider',
   '/auth/refresh',
+  '/admin/login',
   '/providers/details',
   '/health',
 ];

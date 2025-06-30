@@ -110,6 +110,26 @@ class OrderController extends BaseController {
   });
 
   /**
+   * 更新整个订单（备用方法）
+   * PUT /api/orders/:id
+   */
+  updateOrderById = this.asyncHandler(async (req, res) => {
+    const user = this.getCurrentUser(req);
+    const { id: orderId } = this.validatePathParams(req, ['id']);
+    const updateData = req.body;
+
+    this.logOperation('update_order_by_id_request', req, {
+      orderId,
+      updateFields: Object.keys(updateData),
+      userId: user.id
+    });
+
+    const result = await orderService.updateOrder(orderId, updateData, user.id, user.role);
+
+    this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
+
+  /**
    * 更新订单状态
    * PATCH /api/orders/:id/status
    */
@@ -125,6 +145,24 @@ class OrderController extends BaseController {
     });
 
     const result = await orderService.updateOrderStatus(orderId, status, user.id, user.role);
+
+    this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
+
+  /**
+   * 关闭订单
+   * POST /api/orders/:id/close
+   */
+  closeOrder = this.asyncHandler(async (req, res) => {
+    const user = this.getCurrentUser(req);
+    const { id: orderId } = this.validatePathParams(req, ['id']);
+
+    this.logOperation('close_order_request', req, {
+      orderId,
+      userId: user.id
+    });
+
+    const result = await orderService.closeOrder(orderId, user.id, user.role);
 
     this.sendSuccess(res, result.data, result.message, 200, result.meta);
   });
@@ -240,6 +278,76 @@ class OrderController extends BaseController {
     this.sendSuccess(res, result.data, result.message, 200, result.meta);
   });
 
+  /**
+   * 获取订单统计信息（测试兼容方法）
+   * GET /api/orders/stats
+   */
+  getOrderStats = this.asyncHandler(async (req, res) => {
+    const user = this.getCurrentUser(req);
+
+    // 提取过滤参数
+    const filters = this.extractFilterParams(req, ['startDate', 'endDate']);
+
+    this.logOperation('get_order_stats_request', req, {
+      userId: user.id,
+      userRole: user.role,
+      filters
+    });
+
+    const result = await orderService.getUserOrderStats(user.id, user.role, filters);
+
+    this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
+
+  /**
+   * 获取待处理订单列表（管理员功能）
+   * GET /api/admin/orders/pending
+   */
+  getPendingOrders = this.asyncHandler(async (req, res) => {
+    const user = this.getCurrentUser(req);
+
+    // 检查管理员权限
+    if (user.role !== 'admin') {
+      return this.sendError(res, '权限不足，只有管理员可以查看待处理订单', 403, 'INSUFFICIENT_PERMISSIONS');
+    }
+
+    // 提取分页参数
+    const pagination = this.extractPaginationParams(req);
+
+    this.logOperation('get_pending_orders_request', req, {
+      userId: user.id,
+      pagination
+    });
+
+    const result = await orderService.getPendingOrders(pagination);
+
+    this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
+
+  /**
+   * 导出订单数据（管理员功能）
+   * GET /api/admin/orders/export
+   */
+  exportOrders = this.asyncHandler(async (req, res) => {
+    const user = this.getCurrentUser(req);
+
+    // 检查管理员权限
+    if (user.role !== 'admin') {
+      return this.sendError(res, '权限不足，只有管理员可以导出订单', 403, 'INSUFFICIENT_PERMISSIONS');
+    }
+
+    // 提取过滤参数
+    const filters = this.extractFilterParams(req, ['startDate', 'endDate', 'status']);
+
+    this.logOperation('export_orders_request', req, {
+      userId: user.id,
+      filters
+    });
+
+    const result = await orderService.exportOrders(filters);
+
+    this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
 
 }
 

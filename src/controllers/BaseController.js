@@ -255,6 +255,42 @@ class BaseController {
   }
 
   /**
+   * 提取排序参数
+   * @param {Object} req - Express请求对象
+   * @param {Array} allowedFields - 允许的排序字段
+   * @returns {Array} 排序参数数组
+   */
+  extractSortingParams(req, allowedFields = []) {
+    const sorting = [];
+    const { sortBy, sortOrder } = req.query;
+
+    if (sortBy && allowedFields.includes(sortBy)) {
+      const direction = sortOrder && sortOrder.toLowerCase() === 'asc' ? 'asc' : 'desc';
+      sorting.push({ column: sortBy, direction });
+    }
+
+    return sorting;
+  }
+
+  /**
+   * 提取指定字段
+   * @param {Object} data - 数据对象
+   * @param {Array} allowedFields - 允许的字段
+   * @returns {Object} 提取的字段对象
+   */
+  extractFields(data, allowedFields = []) {
+    const extracted = {};
+
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) {
+        extracted[field] = data[field];
+      }
+    }
+
+    return extracted;
+  }
+
+  /**
    * 记录操作日志
    * @param {string} action - 操作名称
    * @param {Object} req - Express请求对象

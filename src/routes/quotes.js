@@ -9,6 +9,20 @@ const { quoteController } = require('../controllers');
 
 const router = express.Router();
 
+// 获取所有报价（用户）
+router.get('/',
+  auth.authenticateToken,
+  validation.validatePagination,
+  validation.validateSorting,
+  quoteController.getUserQuotes
+);
+
+// 批量获取报价
+router.post('/batch',
+  auth.authenticateToken,
+  quoteController.getBatchQuotes
+);
+
 // 供应商提交报价
 router.post('/orders/:orderId',
   auth.authenticateProvider,

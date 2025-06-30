@@ -275,6 +275,103 @@ class OrderService extends BaseService {
   }
 
   /**
+   * 更新整个订单
+   * @param {string} orderId - 订单ID
+   * @param {Object} updateData - 更新数据
+   * @param {string} userId - 用户ID
+   * @param {string} userRole - 用户角色
+   * @returns {Promise<Object>} 更新后的订单
+   */
+  async updateOrder(orderId, updateData, userId, userRole) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ orderId, userId, userRole }, ['orderId', 'userId', 'userRole']);
+
+      // 检查访问权限
+      const hasAccess = await orderRepo.checkUserAccess(orderId, userId, userRole);
+      if (!hasAccess) {
+        throw this.createBusinessError('无权修改此订单', 'ACCESS_DENIED', 403);
+      }
+
+      // 获取现有订单
+      const existingOrder = await orderRepo.findById(orderId);
+      if (!existingOrder) {
+        throw this.createBusinessError('订单不存在', 'ORDER_NOT_FOUND', 404);
+      }
+
+      // 检查订单状态是否允许修改
+      if (existingOrder.status === 'completed' || existingOrder.status === 'cancelled') {
+        throw this.createBusinessError('只能修改状态为活跃的订单', 'ORDER_NOT_EDITABLE', 400);
+      }
+
+      // 过滤允许更新的字段
+      const allowedFields = ['warehouse', 'goods', 'deliveryAddress', 'description', 'requirements'];
+      const filteredUpdateData = {};
+
+      for (const field of allowedFields) {
+        if (updateData[field] !== undefined) {
+          filteredUpdateData[field] = updateData[field];
+        }
+      }
+
+      if (Object.keys(filteredUpdateData).length === 0) {
+        throw this.createBusinessError('没有有效的更新字段', 'NO_VALID_FIELDS', 400);
+      }
+
+      // 更新订单
+      const updatedOrder = await orderRepo.updateById(orderId, filteredUpdateData);
+
+      this.logOperation('order_updated', {
+        orderId,
+        userId,
+        updatedFields: Object.keys(filteredUpdateData)
+      });
+
+      return this.buildResponse(updatedOrder, '订单更新成功');
+    }, 'updateOrder', { orderId, userId });
+  }
+
+  /**
+   * 关闭订单
+   * @param {string} orderId - 订单ID
+   * @param {string} userId - 用户ID
+   * @param {string} userRole - 用户角色
+   * @returns {Promise<Object>} 关闭后的订单
+   */
+  async closeOrder(orderId, userId, userRole) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ orderId, userId, userRole }, ['orderId', 'userId', 'userRole']);
+
+      // 检查访问权限
+      const hasAccess = await orderRepo.checkUserAccess(orderId, userId, userRole);
+      if (!hasAccess) {
+        throw this.createBusinessError('无权关闭此订单', 'ACCESS_DENIED', 403);
+      }
+
+      // 获取现有订单
+      const existingOrder = await orderRepo.findById(orderId);
+      if (!existingOrder) {
+        throw this.createBusinessError('订单不存在', 'ORDER_NOT_FOUND', 404);
+      }
+
+      // 检查订单状态
+      if (existingOrder.status === 'cancelled') {
+        throw this.createBusinessError('订单已关闭', 'ORDER_ALREADY_CLOSED', 400);
+      }
+
+      // 关闭订单（设置状态为cancelled）
+      const updatedOrder = await orderRepo.updateById(orderId, { status: 'cancelled' });
+
+      this.logOperation('order_closed', {
+        orderId,
+        userId,
+        previousStatus: existingOrder.status
+      });
+
+      return this.buildResponse(updatedOrder, '订单已关闭');
+    }, 'closeOrder', { orderId, userId });
+  }
+
+  /**
    * 删除订单
    * @param {string} orderId - 订单ID
    * @param {string} userId - 用户ID
@@ -440,6 +537,17 @@ class OrderService extends BaseService {
   }
 
   /**
+   * 获取订单统计信息（测试兼容方法）
+   * @param {string} userId - 用户ID
+   * @param {string} userRole - 用户角色
+   * @param {Object} filters - 过滤条件
+   * @returns {Promise<Object>} 统计信息
+   */
+  async getOrderStats(userId, userRole, filters = {}) {
+    return this.getUserOrderStats(userId, userRole, filters);
+  }
+
+  /**
    * 搜索订单
    * @param {string} searchTerm - 搜索关键词
    * @param {string} userId - 用户ID
@@ -489,6 +597,43 @@ class OrderService extends BaseService {
 
       return this.buildResponse(stats, '获取订单统计成功');
     }, 'getAdminOrderStats');
+  }
+
+  /**
+   * 获取所有订单列表（管理员功能）
+   * @param {Object} options - 查询选项
+   * @param {string} userRole - 用户角色
+   * @returns {Promise<Object>} 订单列表
+   */
+  async getOrderList(options = {}, userRole) {
+    return this.handleAsyncOperation(async () => {
+      // 验证管理员权限
+      if (userRole !== 'admin') {
+        throw this.createBusinessError('无权限查看所有订单', 'ACCESS_DENIED', 403);
+      }
+
+      // 标准化分页参数
+      const pagination = this.normalizePaginationParams(options);
+
+      // 标准化排序参数
+      const orderBy = this.normalizeOrderByParams(options.orderBy, this.allowedSortFields);
+
+      // 构建查询选项
+      const queryOptions = {
+        status: options.status || null,
+        limit: pagination.limit,
+        offset: pagination.offset,
+        orderBy: orderBy.length > 0 ? orderBy : [{ column: 'created_at', direction: 'desc' }]
+      };
+
+      // 获取订单列表和总数
+      const [orders, total] = await Promise.all([
+        orderRepo.findMany({}, queryOptions),
+        orderRepo.count(options.status ? { status: options.status } : {})
+      ]);
+
+      return this.buildPaginatedResponse(orders, total, pagination, '获取订单列表成功');
+    }, 'getOrderList', { options, userRole });
   }
 
   /**

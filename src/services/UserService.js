@@ -21,6 +21,7 @@ class UserService extends BaseService {
     this.passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     this.emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     this.passwordHistoryRepo = new PasswordHistoryRepository();
+    this.userRepo = userRepo; // 添加userRepo实例属性
   }
 
   /**
@@ -55,7 +56,7 @@ class UserService extends BaseService {
 
       // 使用新的密码策略验证密码强度
       const passwordValidation = passwordPolicy.validatePassword(cleanData.password, {
-        username: cleanData.username,
+        name: cleanData.name,
         email: cleanData.email
       });
 
@@ -103,6 +104,77 @@ class UserService extends BaseService {
   }
 
   /**
+   * 管理员创建用户
+   * @param {Object} userData - 用户数据
+   * @param {string} adminRole - 管理员角色
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createUserByAdmin(userData, adminRole) {
+    return this.handleAsyncOperation(async () => {
+      // 验证管理员权限
+      if (adminRole !== 'admin') {
+        throw this.createBusinessError('无权限创建用户', 'ACCESS_DENIED', 403);
+      }
+
+      // 验证必需参数
+      this.validateRequiredParams(userData, ['email', 'password', 'name']);
+
+      // 验证参数类型
+      this.validateParamTypes(userData, {
+        email: 'string',
+        password: 'string',
+        name: 'string'
+      });
+
+      // 清理和标准化数据
+      const cleanData = {
+        email: userData.email.trim().toLowerCase(),
+        password: userData.password,
+        name: userData.name.trim(),
+        role: userData.role || 'user'
+      };
+
+      // 验证邮箱格式
+      if (!this.emailRegex.test(cleanData.email)) {
+        throw this.createBusinessError('邮箱格式无效');
+      }
+
+      // 使用新的密码策略验证密码强度
+      const passwordValidation = passwordPolicy.validatePassword(cleanData.password, {
+        name: cleanData.name,
+        email: cleanData.email
+      });
+
+      if (!passwordValidation.isValid) {
+        const errorMessage = passwordValidation.errors.join('; ');
+        throw this.createBusinessError(`密码不符合安全要求: ${errorMessage}`);
+      }
+
+      // 验证姓名长度
+      if (cleanData.name.length < 2 || cleanData.name.length > 50) {
+        throw this.createBusinessError('姓名长度必须在2-50字符之间');
+      }
+
+      // 验证角色
+      const validRoles = ['user', 'admin'];
+      if (!validRoles.includes(cleanData.role)) {
+        throw this.createBusinessError('无效的用户角色');
+      }
+
+      // 创建用户（不生成token）
+      const newUser = await userRepo.createUser(cleanData);
+
+      this.logOperation('admin_created_user', {
+        userId: newUser.id,
+        email: newUser.email,
+        role: newUser.role
+      });
+
+      return this.buildResponse(newUser, '用户创建成功');
+    }, 'createUserByAdmin', { email: userData.email });
+  }
+
+  /**
    * 用户登录
    * @param {string} email - 邮箱
    * @param {string} password - 密码
@@ -134,6 +206,47 @@ class UserService extends BaseService {
         refreshToken: tokens.refreshToken
       }, '登录成功');
     }, 'loginUser', { email });
+  }
+
+  /**
+   * 供应商登录
+   * @param {string} accessKey - 访问密钥
+   * @returns {Promise<Object>} 登录结果
+   */
+  async loginProvider(accessKey) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ accessKey }, ['accessKey']);
+
+      const cleanAccessKey = accessKey.trim();
+
+      // 验证供应商访问密钥
+      const provider = await userRepo.validateProviderAccessKey(cleanAccessKey);
+      if (!provider) {
+        throw this.createBusinessError('访问密钥无效', 'INVALID_ACCESS_KEY', 401);
+      }
+
+      this.logOperation('provider_logged_in', {
+        providerId: provider.id,
+        providerName: provider.name
+      });
+
+      // 创建供应商用户对象
+      const providerUser = {
+        id: provider.id,
+        name: provider.name,
+        role: 'provider',
+        providerId: provider.id
+      };
+
+      // 生成JWT令牌
+      const tokens = this.generateToken(providerUser);
+
+      return this.buildResponse({
+        user: providerUser,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+      }, '供应商登录成功');
+    }, 'loginProvider', { accessKey: accessKey.substring(0, 10) + '...' });
   }
 
   /**
@@ -323,6 +436,60 @@ class UserService extends BaseService {
 
       return this.buildResponse(updatedUser, '用户信息更新成功');
     }, 'updateUser', { userId });
+  }
+
+  /**
+   * 管理员删除用户
+   * @param {string} userId - 用户ID
+   * @param {string} adminRole - 管理员角色
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteUserByAdmin(userId, adminRole) {
+    return this.handleAsyncOperation(async () => {
+      // 验证管理员权限
+      if (adminRole !== 'admin') {
+        throw this.createBusinessError('无权限删除用户', 'ACCESS_DENIED', 403);
+      }
+
+      this.validateRequiredParams({ userId }, ['userId']);
+
+      // 获取用户信息
+      const existingUser = await userRepo.findById(userId);
+      if (!existingUser) {
+        throw this.createBusinessError('用户不存在', 'USER_NOT_FOUND', 404);
+      }
+
+      // 防止删除管理员账户
+      if (existingUser.role === 'admin') {
+        throw this.createBusinessError('不能删除管理员账户', 'CANNOT_DELETE_ADMIN', 400);
+      }
+
+      // 检查用户是否有关联的订单
+      const hasOrders = await userRepo.hasUserOrders(userId);
+      if (hasOrders) {
+        // 如果有订单，只是禁用用户而不是删除
+        const updatedUser = await userRepo.updateUser(userId, { isActive: false });
+
+        this.logOperation('admin_disabled_user_with_orders', {
+          userId,
+          email: existingUser.email,
+          reason: 'has_orders'
+        });
+
+        return this.buildResponse(updatedUser, '用户已禁用（因为有关联订单）');
+      }
+
+      // 删除用户
+      await userRepo.deleteById(userId);
+
+      this.logOperation('admin_deleted_user', {
+        userId,
+        email: existingUser.email,
+        name: existingUser.name
+      });
+
+      return this.buildResponse({ userId }, '用户删除成功');
+    }, 'deleteUserByAdmin', { userId });
   }
 
   /**
@@ -964,6 +1131,135 @@ class UserService extends BaseService {
 
       return this.buildResponse(exportInfo, '用户导出任务已创建');
     }, 'exportUsers', { filters, format });
+  }
+
+  /**
+   * 管理员登录
+   * @param {string} password - 管理员密码
+   * @returns {Promise<Object>} 登录结果
+   */
+  async adminLogin(password) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ password }, ['password']);
+
+      // 从数据库验证管理员密码
+      const adminUser = await this.userRepo.validateAdmin(password);
+      if (!adminUser) {
+        throw this.createBusinessError('管理员密码错误', 'INVALID_ADMIN_PASSWORD', 401);
+      }
+
+      this.logOperation('admin_logged_in', {
+        adminId: adminUser.id
+      });
+
+      // 生成JWT令牌
+      const tokens = this.generateToken(adminUser);
+
+      return this.buildResponse({
+        user: adminUser,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+      }, '管理员登录成功');
+    }, 'adminLogin');
+  }
+
+  /**
+   * 管理员登出
+   * @param {string} adminId - 管理员ID
+   * @returns {Promise<Object>} 登出结果
+   */
+  async adminLogout(adminId) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ adminId }, ['adminId']);
+
+      this.logOperation('admin_logged_out', {
+        adminId
+      });
+
+      return this.buildResponse(null, '管理员登出成功');
+    }, 'adminLogout', { adminId });
+  }
+
+  /**
+   * 管理员修改密码
+   * @param {string} adminId - 管理员ID
+   * @param {string} currentPassword - 当前密码
+   * @param {string} newPassword - 新密码
+   * @returns {Promise<Object>} 修改结果
+   */
+  async adminChangePassword(adminId, currentPassword, newPassword) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ adminId, currentPassword, newPassword },
+        ['adminId', 'currentPassword', 'newPassword']);
+
+      // 验证当前密码
+      const adminUser = await this.userRepo.validateAdmin(currentPassword);
+      if (!adminUser) {
+        throw this.createBusinessError('当前密码错误', 'INVALID_CURRENT_PASSWORD', 400);
+      }
+
+      // 验证新密码格式
+      if (!this.passwordRegex.test(newPassword)) {
+        throw this.createBusinessError(
+          '新密码必须包含大小写字母、数字和特殊字符，长度至少8位',
+          'INVALID_PASSWORD_FORMAT',
+          400
+        );
+      }
+
+      // 检查新密码是否与当前密码相同
+      const admin = await this.userRepo.findAdmin();
+      const isSamePassword = await bcrypt.compare(newPassword, admin.password);
+      if (isSamePassword) {
+        throw this.createBusinessError('新密码不能与当前密码相同', 'SAME_PASSWORD', 400);
+      }
+
+      // 更新数据库中的管理员密码
+      const updateSuccess = await this.userRepo.updateAdminPassword(newPassword);
+      if (!updateSuccess) {
+        throw this.createBusinessError('密码更新失败', 'PASSWORD_UPDATE_FAILED', 500);
+      }
+
+      this.logOperation('admin_password_changed', {
+        adminId
+      });
+
+      return this.buildResponse(null, '管理员密码修改成功，请使用新密码重新登录');
+    }, 'adminChangePassword', { adminId });
+  }
+
+  /**
+   * 获取管理员统计信息
+   * @returns {Promise<Object>} 统计信息
+   */
+  async getAdminStats() {
+    return this.handleAsyncOperation(async () => {
+      // 获取用户统计
+      const userStats = await userRepo.getUserStats();
+
+      // 获取订单统计（如果有订单仓库的话）
+      // const orderStats = await orderRepo.getOrderStats();
+
+      // 获取报价统计（如果有报价仓库的话）
+      // const quoteStats = await quoteRepo.getQuoteStats();
+
+      const stats = {
+        users: userStats,
+        system: {
+          uptime: process.uptime(),
+          nodeVersion: process.version,
+          platform: process.platform,
+          memory: process.memoryUsage()
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      this.logOperation('admin_stats_retrieved', {
+        statsKeys: Object.keys(stats)
+      });
+
+      return this.buildResponse(stats, '管理员统计信息获取成功');
+    }, 'getAdminStats');
   }
 }
 

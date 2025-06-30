@@ -7,6 +7,7 @@ const OrderRepository = require('./OrderRepository');
 const QuoteRepository = require('./QuoteRepository');
 const UserRepository = require('./UserRepository');
 const ProviderRepository = require('./ProviderRepository');
+const SystemConfigRepository = require('./SystemConfigRepository');
 const { logger } = require('../config/logger');
 
 class RepositoryFactory {
@@ -29,6 +30,7 @@ class RepositoryFactory {
       this.repositories.set('quote', new QuoteRepository());
       this.repositories.set('user', new UserRepository());
       this.repositories.set('provider', new ProviderRepository());
+      this.repositories.set('systemConfig', new SystemConfigRepository());
 
       this.initialized = true;
       logger.info('Repository工厂初始化完成', {
@@ -93,6 +95,14 @@ class RepositoryFactory {
   }
 
   /**
+   * 获取系统配置Repository
+   * @returns {SystemConfigRepository} 系统配置Repository实例
+   */
+  get systemConfig() {
+    return this.getRepository('systemConfig');
+  }
+
+  /**
    * 获取所有Repository的健康状态
    * @returns {Promise<Object>} 健康状态信息
    */
@@ -147,6 +157,7 @@ module.exports = {
   QuoteRepository,
   UserRepository,
   ProviderRepository,
+  SystemConfigRepository,
   
   // 便捷的访问方式
   get orderRepo() {
@@ -163,5 +174,9 @@ module.exports = {
   
   get providerRepo() {
     return repositoryFactory.provider;
+  },
+
+  get systemConfigRepo() {
+    return repositoryFactory.systemConfig;
   }
 };

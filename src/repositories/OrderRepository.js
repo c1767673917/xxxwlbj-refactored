@@ -639,6 +639,62 @@ class OrderRepository extends BaseRepository {
       throw error;
     }
   }
+
+  /**
+   * 根据订单ID数组和用户ID查找用户的订单
+   * @param {Array} orderIds - 订单ID数组
+   * @param {string} userId - 用户ID
+   * @param {Object} trx - 可选的事务对象
+   * @returns {Promise<Array>} 用户的订单数组
+   */
+  async findUserOrdersByIds(orderIds, userId, trx = null) {
+    try {
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        return [];
+      }
+
+      let query = this.db(this.tableName)
+        .whereIn('id', orderIds)
+        .where('user_id', userId);
+
+      if (trx) {
+        query = query.transacting(trx);
+      }
+
+      return await query;
+    } catch (error) {
+      logger.error('根据订单ID数组查找用户订单失败', {
+        orderIds,
+        userId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 查找可用的订单（供应商可以报价的订单）
+   * @param {Object} trx - 可选的事务对象
+   * @returns {Promise<Array>} 可用订单数组
+   */
+  async findAvailableOrders(trx = null) {
+    try {
+      let query = this.db(this.tableName)
+        .where('status', 'active')
+        .orderBy('created_at', 'desc');
+
+      if (trx) {
+        query = query.transacting(trx);
+      }
+
+      return await query;
+    } catch (error) {
+      logger.error('查找可用订单失败', {
+        error: error.message
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = OrderRepository;

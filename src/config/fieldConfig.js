@@ -144,6 +144,71 @@ const fieldConfig = {
       'provider',
       'orderId'
     ]
+  },
+
+  // 供应商模块字段配置
+  provider: {
+    // 允许排序的字段
+    sortFields: [
+      'createdAt',
+      'updatedAt',
+      'name',
+      'status'
+    ],
+
+    // 允许过滤的字段
+    filterFields: [
+      'status',
+      'startDate',
+      'endDate'
+    ],
+
+    // 允许搜索的字段
+    searchFields: [
+      'name',
+      'id'
+    ],
+
+    // 允许更新的字段
+    updateFields: [
+      'name',
+      'wechatWebhookUrl',
+      'status'
+    ],
+
+    // 创建供应商时必需的字段
+    requiredFields: [
+      'name'
+    ]
+  },
+
+  // 用户活动模块字段配置
+  userActivity: {
+    // 允许排序的字段
+    sortFields: [
+      'createdAt',
+      'action',
+      'status',
+      'userId'
+    ],
+
+    // 允许过滤的字段
+    filterFields: [
+      'userId',
+      'action',
+      'resourceType',
+      'status',
+      'startDate',
+      'endDate'
+    ],
+
+    // 允许搜索的字段
+    searchFields: [
+      'action',
+      'description',
+      'userEmail',
+      'userName'
+    ]
   }
 };
 

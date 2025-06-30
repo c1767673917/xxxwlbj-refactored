@@ -22,8 +22,17 @@ export const useAuth = (): UseAuthReturn => {
   // 检查认证状态
   const checkAuth = useCallback(async () => {
     try {
-      const token = localStorage.getItem('wlbj_access_token');
-      const userData = localStorage.getItem('wlbj_user');
+      // 首先检查普通用户认证信息
+      let token = localStorage.getItem('wlbj_access_token');
+      let userData = localStorage.getItem('wlbj_user');
+      let isAdmin = false;
+
+      // 如果没有普通用户认证信息，检查管理员认证信息
+      if (!token || !userData) {
+        token = localStorage.getItem('wlbj_admin_access_token');
+        userData = localStorage.getItem('wlbj_admin_user');
+        isAdmin = true;
+      }
 
       if (token && userData) {
         // 验证token是否仍然有效
@@ -38,9 +47,15 @@ export const useAuth = (): UseAuthReturn => {
         } catch (error) {
           console.error('Token验证失败:', error);
           // 清除无效的认证信息
-          localStorage.removeItem('wlbj_access_token');
-          localStorage.removeItem('wlbj_refresh_token');
-          localStorage.removeItem('wlbj_user');
+          if (isAdmin) {
+            localStorage.removeItem('wlbj_admin_access_token');
+            localStorage.removeItem('wlbj_admin_refresh_token');
+            localStorage.removeItem('wlbj_admin_user');
+          } else {
+            localStorage.removeItem('wlbj_access_token');
+            localStorage.removeItem('wlbj_refresh_token');
+            localStorage.removeItem('wlbj_user');
+          }
           setUser(null);
         }
       }
@@ -89,32 +104,55 @@ export const useAuth = (): UseAuthReturn => {
   // 登出
   const logout = useCallback(async () => {
     try {
-      await api.auth.logout();
+      // 根据当前用户类型调用相应的登出API
+      if (user?.role === 'admin') {
+        await api.admin.logout();
+      } else {
+        await api.auth.logout();
+      }
     } catch (error) {
       console.error('登出API调用失败:', error);
     } finally {
-      // 清除本地认证信息
+      // 清除本地认证信息（包括普通用户和管理员）
       localStorage.removeItem('wlbj_access_token');
       localStorage.removeItem('wlbj_refresh_token');
       localStorage.removeItem('wlbj_user');
+      localStorage.removeItem('wlbj_admin_access_token');
+      localStorage.removeItem('wlbj_admin_refresh_token');
+      localStorage.removeItem('wlbj_admin_user');
       localStorage.removeItem('provider_token');
       localStorage.removeItem('provider_key');
-      
+
       setUser(null);
       navigate('/');
     }
-  }, [navigate]);
+  }, [navigate, user]);
 
   // 刷新令牌
   const refreshToken = useCallback(async () => {
     try {
-      const refreshToken = localStorage.getItem('wlbj_refresh_token');
+      // 首先尝试普通用户的刷新令牌
+      let refreshToken = localStorage.getItem('wlbj_refresh_token');
+      let isAdmin = false;
+
+      // 如果没有普通用户的刷新令牌，尝试管理员的
+      if (!refreshToken) {
+        refreshToken = localStorage.getItem('wlbj_admin_refresh_token');
+        isAdmin = true;
+      }
+
       if (!refreshToken) {
         throw new Error('No refresh token available');
       }
-      
+
       const response = await api.auth.refresh(refreshToken);
-      localStorage.setItem('wlbj_access_token', response.accessToken);
+
+      // 根据用户类型保存新的访问令牌
+      if (isAdmin) {
+        localStorage.setItem('wlbj_admin_access_token', response.accessToken);
+      } else {
+        localStorage.setItem('wlbj_access_token', response.accessToken);
+      }
     } catch (error) {
       console.error('刷新令牌失败:', error);
       await logout();

@@ -29,6 +29,12 @@ router.get('/all',
   adminUserController.getAllUsers
 );
 
+// 创建用户
+router.post('/',
+  validation.validateUserCreation,
+  adminUserController.createUser
+);
+
 // 获取用户详情
 router.get('/:userId',
   adminUserController.getUserById
@@ -37,6 +43,11 @@ router.get('/:userId',
 // 更新用户信息
 router.put('/:userId',
   adminUserController.updateUser
+);
+
+// 删除用户
+router.delete('/:userId',
+  adminUserController.deleteUser
 );
 
 // 激活/禁用用户

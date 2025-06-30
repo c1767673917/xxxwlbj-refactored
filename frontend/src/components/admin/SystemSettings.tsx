@@ -4,7 +4,7 @@ import { SettingsIcon, SaveIcon, LockIcon } from 'lucide-react';
 import api from '@/services/api';
 
 const SystemSettings = () => {
-  const [, ] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -61,23 +61,49 @@ const SystemSettings = () => {
     }
   };
 
+  // 加载系统配置
+  const loadSystemConfig = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const config = await api.admin.getSystemConfig();
+
+      // 更新系统配置状态
+      setSystemConfig(prevConfig => ({
+        ...prevConfig,
+        ...config
+      }));
+    } catch (error) {
+      console.error('加载系统配置失败:', error);
+      setError(error instanceof Error ? error.message : '加载系统配置失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 保存系统配置
   const handleSaveConfig = async () => {
     try {
       setSaving(true);
       setError(null);
-      
-      // 这里应该调用保存系统配置的API
-      // await api.admin.updateSystemConfig(systemConfig);
-      
+
+      // 调用保存系统配置的API
+      await api.admin.updateSystemConfig(systemConfig);
+
       setSuccess('系统配置保存成功');
     } catch (error) {
       console.error('保存系统配置失败:', error);
-      setError('保存系统配置失败');
+      setError(error instanceof Error ? error.message : '保存系统配置失败');
     } finally {
       setSaving(false);
     }
   };
+
+  // 组件加载时获取系统配置
+  useEffect(() => {
+    loadSystemConfig();
+  }, []);
 
   // 清除消息
   useEffect(() => {
@@ -89,6 +115,15 @@ const SystemSettings = () => {
       return () => clearTimeout(timer);
     }
   }, [success, error]);
+
+  // 如果正在加载，显示加载状态
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-gray-600">加载系统配置中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

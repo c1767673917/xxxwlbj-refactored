@@ -6,6 +6,7 @@
 const OrderController = require('./OrderController');
 const QuoteController = require('./QuoteController');
 const UserController = require('./UserController');
+const ProviderController = require('./ProviderController');
 const { logger } = require('../config/logger');
 
 class ControllerFactory {
@@ -27,6 +28,7 @@ class ControllerFactory {
       this.controllers.set('order', new OrderController());
       this.controllers.set('quote', new QuoteController());
       this.controllers.set('user', new UserController());
+      this.controllers.set('provider', new ProviderController());
 
       this.initialized = true;
       logger.info('Controller工厂初始化完成', {
@@ -80,6 +82,14 @@ class ControllerFactory {
    */
   get user() {
     return this.getController('user');
+  }
+
+  /**
+   * 获取供应商Controller
+   * @returns {ProviderController} 供应商Controller实例
+   */
+  get provider() {
+    return this.getController('provider');
   }
 
   /**
@@ -139,6 +149,7 @@ module.exports = {
   OrderController,
   QuoteController,
   UserController,
+  ProviderController,
   
   // 便捷的访问方式
   get orderController() {
@@ -151,5 +162,9 @@ module.exports = {
   
   get userController() {
     return controllerFactory.user;
+  },
+
+  get providerController() {
+    return controllerFactory.provider;
   }
 };

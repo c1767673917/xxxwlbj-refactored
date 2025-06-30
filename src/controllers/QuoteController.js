@@ -16,6 +16,61 @@ class QuoteController extends BaseController {
   }
 
   /**
+   * 获取用户的所有报价
+   * GET /api/quotes
+   */
+  getUserQuotes = this.asyncHandler(async (req, res) => {
+    const user = this.getCurrentUser(req);
+
+    // 提取查询参数
+    const pagination = this.extractPaginationParams(req);
+    const orderBy = this.extractSortParams(req, this.allowedSortFields);
+    const filters = this.extractFilterParams(req, this.allowedFilterFields);
+
+    const options = {
+      ...pagination,
+      orderBy,
+      ...filters
+    };
+
+    this.logOperation('get_user_quotes_request', req, {
+      userId: user.id,
+      options
+    });
+
+    const result = await quoteService.getUserQuotes(user.id, options, user.role);
+
+    this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
+
+  /**
+   * 批量获取报价
+   * POST /api/quotes/batch
+   */
+  getBatchQuotes = this.asyncHandler(async (req, res) => {
+    const user = this.getCurrentUser(req);
+    const { orderIds } = this.validateRequestBody(req, ['orderIds']);
+
+    // 验证orderIds是数组
+    if (!Array.isArray(orderIds)) {
+      return this.sendError(res, 'orderIds必须是数组', 400, 'INVALID_ORDER_IDS');
+    }
+
+    if (orderIds.length === 0) {
+      return this.sendError(res, 'orderIds不能为空', 400, 'EMPTY_ORDER_IDS');
+    }
+
+    this.logOperation('get_batch_quotes_request', req, {
+      userId: user.id,
+      orderCount: orderIds.length
+    });
+
+    const result = await quoteService.getBatchQuotes(orderIds, user.id, user.role);
+
+    this.sendSuccess(res, result.data, result.message, 200, result.meta);
+  });
+
+  /**
    * 创建或更新报价（供应商接口）
    * POST /api/quotes/:orderId
    */

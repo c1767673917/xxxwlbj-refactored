@@ -57,6 +57,9 @@ const config = {
     file: process.env.LOG_FILE || './logs/app.log',
   },
 
+  // 管理员配置已迁移到数据库
+  // 不再使用环境变量存储管理员密码
+
   // 企业微信配置
   wechat: {
     webhookUrl: process.env.WECHAT_WEBHOOK_URL,
@@ -118,6 +121,9 @@ config.validate = () => {
   if (config.app.env === 'production') {
     if (!process.env.JWT_SECRET) {
       errors.push('JWT_SECRET environment variable is required in production');
+    }
+    if (!process.env.ADMIN_PASSWORD) {
+      errors.push('ADMIN_PASSWORD environment variable is required in production');
     }
   }
 

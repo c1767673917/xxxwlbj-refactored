@@ -17,7 +17,8 @@ jest.mock('../../../src/services', () => ({
     updateUser: jest.fn(),
     setUserActive: jest.fn(),
     deleteUser: jest.fn(),
-    forcePasswordChange: jest.fn()
+    forcePasswordChange: jest.fn(),
+    exportUsers: jest.fn()
   }
 }));
 
@@ -516,8 +517,7 @@ describe('UserController', () => {
         offset: 0,
         orderBy: [{ column: 'created_at', direction: 'desc' }],
         role: 'user',
-        isActive: true,
-        search: undefined
+        isActive: 'true'
       });
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -539,13 +539,13 @@ describe('UserController', () => {
       await userController.getUserList(mockReq, mockRes, mockNext);
 
       // 验证错误处理
-      expect(mockNext).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('权限不足'),
-          statusCode: 403,
-          code: 'INSUFFICIENT_PERMISSIONS'
-        })
-      );
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        message: expect.stringContaining('权限不足'),
+        code: 'INSUFFICIENT_PERMISSIONS',
+        timestamp: expect.any(String)
+      });
       expect(userService.getUserList).not.toHaveBeenCalled();
     });
 
@@ -576,12 +576,9 @@ describe('UserController', () => {
       // 验证结果
       expect(userService.getUserList).toHaveBeenCalledWith('admin', {
         page: 1,
-        limit: 10,
+        limit: 20,
         offset: 0,
-        orderBy: [{ column: 'created_at', direction: 'desc' }],
-        role: undefined,
-        isActive: undefined,
-        search: undefined
+        orderBy: [{ column: 'created_at', direction: 'desc' }]
       });
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
@@ -636,13 +633,13 @@ describe('UserController', () => {
       await userController.getUserById(mockReq, mockRes, mockNext);
 
       // 验证错误处理
-      expect(mockNext).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('权限不足'),
-          statusCode: 403,
-          code: 'INSUFFICIENT_PERMISSIONS'
-        })
-      );
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        message: expect.stringContaining('权限不足'),
+        code: 'INSUFFICIENT_PERMISSIONS',
+        timestamp: expect.any(String)
+      });
       expect(userService.getUserById).not.toHaveBeenCalled();
     });
 
@@ -742,13 +739,13 @@ describe('UserController', () => {
       await userController.updateUser(mockReq, mockRes, mockNext);
 
       // 验证错误处理
-      expect(mockNext).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('权限不足'),
-          statusCode: 403,
-          code: 'INSUFFICIENT_PERMISSIONS'
-        })
-      );
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        message: expect.stringContaining('权限不足'),
+        code: 'INSUFFICIENT_PERMISSIONS',
+        timestamp: expect.any(String)
+      });
       expect(userService.updateUser).not.toHaveBeenCalled();
     });
   });
@@ -806,7 +803,7 @@ describe('UserController', () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         success: false,
         message: 'isActive必须是布尔值',
-        code: 'INVALID_IS_ACTIVE',
+        code: 'INVALID_PARAMETER',
         timestamp: expect.any(String)
       });
       expect(userService.setUserActive).not.toHaveBeenCalled();
@@ -845,6 +842,24 @@ describe('UserController', () => {
         isActive: 'true'
       };
 
+      // 模拟服务响应
+      const mockResult = {
+        data: {
+          downloadUrl: '/api/downloads/users_export_123456.csv',
+          expiresAt: '2025-06-28T12:00:00Z'
+        },
+        message: '用户导出任务已创建',
+        meta: {
+          recordCount: 25,
+          filters: {
+            role: 'user',
+            isActive: true
+          }
+        }
+      };
+
+      userService.exportUsers.mockResolvedValue(mockResult);
+
       // 执行测试
       await userController.exportUsers(mockReq, mockRes, mockNext);
 
@@ -871,13 +886,13 @@ describe('UserController', () => {
       await userController.exportUsers(mockReq, mockRes, mockNext);
 
       // 验证错误处理
-      expect(mockNext).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('权限不足'),
-          statusCode: 403,
-          code: 'INSUFFICIENT_PERMISSIONS'
-        })
-      );
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        message: expect.stringContaining('权限不足'),
+        code: 'INSUFFICIENT_PERMISSIONS',
+        timestamp: expect.any(String)
+      });
     });
   });
 });

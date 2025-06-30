@@ -9,6 +9,10 @@ const orderRoutes = require('./orders');
 const quoteRoutes = require('./quotes');
 const userRoutes = require('./users');
 const adminRoutes = require('./admin');
+const providerRoutes = require('./providers');
+const exportRoutes = require('./export');
+const importRoutes = require('./import');
+const activityRoutes = require('./activity');
 
 const router = express.Router();
 
@@ -26,5 +30,17 @@ router.use('/users', userRoutes);
 
 // 管理员相关路由
 router.use('/admin', adminRoutes);
+
+// 供应商相关路由
+router.use('/providers', providerRoutes);
+
+// 导出相关路由
+router.use('/export', exportRoutes);
+
+// 导入相关路由
+router.use('/import', importRoutes);
+
+// 用户活动相关路由
+router.use('/activity', activityRoutes);
 
 module.exports = router;

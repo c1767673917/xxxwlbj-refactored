@@ -174,12 +174,17 @@ class BaseRepository {
         updated_at: now
       };
 
-      const [id] = await this.query(trx)
-        .insert(dataWithTimestamps)
-        .returning(this.primaryKey);
+      // SQLite不支持returning，所以我们需要使用原始数据中的ID
+      await this.query(trx)
+        .insert(dataWithTimestamps);
 
-      // 返回创建的记录
-      return await this.findById(id || data[this.primaryKey], trx);
+      // 返回创建的记录，使用原始数据中的主键值
+      const recordId = data[this.primaryKey];
+      if (!recordId) {
+        throw new Error(`主键 ${this.primaryKey} 在创建数据中未找到`);
+      }
+
+      return await this.findById(recordId, trx);
     } catch (error) {
       logger.error('创建记录失败', {
         table: this.tableName,

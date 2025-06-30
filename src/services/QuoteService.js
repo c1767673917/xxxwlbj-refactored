@@ -192,6 +192,103 @@ class QuoteService extends BaseService {
   }
 
   /**
+   * 获取用户的所有报价
+   * @param {string} userId - 用户ID
+   * @param {Object} options - 查询选项
+   * @param {string} userRole - 用户角色
+   * @returns {Promise<Object>} 报价列表
+   */
+  async getUserQuotes(userId, options = {}, userRole) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ userId, userRole }, ['userId', 'userRole']);
+
+      // 构建查询选项
+      const queryOptions = {
+        page: options.page || 1,
+        pageSize: Math.min(options.pageSize || 20, 100),
+        orderBy: options.orderBy || [{ column: 'createdAt', order: 'desc' }],
+        userId: userRole === 'admin' ? null : userId // 管理员可以看所有报价
+      };
+
+      // 添加过滤条件
+      if (options.status) {
+        queryOptions.status = options.status;
+      }
+      if (options.provider) {
+        queryOptions.provider = options.provider;
+      }
+      if (options.minPrice) {
+        queryOptions.minPrice = parseFloat(options.minPrice);
+      }
+      if (options.maxPrice) {
+        queryOptions.maxPrice = parseFloat(options.maxPrice);
+      }
+
+      const result = await quoteRepo.findUserQuotes(queryOptions);
+
+      this.logOperation('user_quotes_retrieved', {
+        userId,
+        userRole,
+        totalCount: result.total,
+        pageSize: queryOptions.pageSize
+      });
+
+      return this.buildResponse(result.data, '获取报价列表成功', result.meta);
+    }, 'getUserQuotes', { userId });
+  }
+
+  /**
+   * 批量获取报价
+   * @param {Array} orderIds - 订单ID数组
+   * @param {string} userId - 用户ID
+   * @param {string} userRole - 用户角色
+   * @returns {Promise<Object>} 批量报价结果
+   */
+  async getBatchQuotes(orderIds, userId, userRole) {
+    return this.handleAsyncOperation(async () => {
+      this.validateRequiredParams({ orderIds, userId, userRole }, ['orderIds', 'userId', 'userRole']);
+
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        throw this.createBusinessError('订单ID列表不能为空', 'EMPTY_ORDER_IDS', 400);
+      }
+
+      // 限制批量查询的数量
+      if (orderIds.length > 50) {
+        throw this.createBusinessError('一次最多只能查询50个订单的报价', 'TOO_MANY_ORDERS', 400);
+      }
+
+      // 验证用户对这些订单的访问权限
+      if (userRole !== 'admin') {
+        const userOrders = await orderRepo.findUserOrdersByIds(orderIds, userId);
+        const userOrderIds = userOrders.map(order => order.id);
+        const unauthorizedIds = orderIds.filter(id => !userOrderIds.includes(id));
+
+        if (unauthorizedIds.length > 0) {
+          throw this.createBusinessError('无权查看部分订单的报价', 'ACCESS_DENIED', 403);
+        }
+      }
+
+      // 批量获取报价
+      const quotes = await quoteRepo.findByOrderIds(orderIds);
+
+      // 按订单ID分组
+      const quotesByOrder = {};
+      orderIds.forEach(orderId => {
+        quotesByOrder[orderId] = quotes.filter(quote => quote.orderId === orderId);
+      });
+
+      this.logOperation('batch_quotes_retrieved', {
+        userId,
+        userRole,
+        orderCount: orderIds.length,
+        totalQuotes: quotes.length
+      });
+
+      return this.buildResponse(quotesByOrder, '批量获取报价成功');
+    }, 'getBatchQuotes', { userId, orderCount: orderIds.length });
+  }
+
+  /**
    * 获取报价详情
    * @param {string} quoteId - 报价ID
    * @param {string} userId - 用户ID

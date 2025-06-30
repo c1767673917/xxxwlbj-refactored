@@ -39,7 +39,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.PROD ? '/api' : 'http://localhost:3000/api');
 
 // 认证API端点（不需要token）
-const PUBLIC_ENDPOINTS = ['/auth/login', '/auth/login/provider', '/auth/refresh', '/providers/details'];
+const PUBLIC_ENDPOINTS = ['/auth/login', '/auth/login/provider', '/auth/refresh', '/providers/details', '/admin/login'];
 
 // 请求配置常量 (预留用于未来功能)
 // const REQUEST_TIMEOUT = parseInt(import.meta.env.VITE_REQUEST_TIMEOUT || '10000', 10);
@@ -64,7 +64,11 @@ async function apiRequest<T>(
 
   // 如果不是公开端点，添加认证头
   if (!isPublicEndpoint(endpoint)) {
-    const accessToken = localStorage.getItem('wlbj_access_token');
+    // 首先尝试普通用户token，然后尝试管理员token
+    let accessToken = localStorage.getItem('wlbj_access_token');
+    if (!accessToken) {
+      accessToken = localStorage.getItem('wlbj_admin_access_token');
+    }
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
@@ -80,7 +84,15 @@ async function apiRequest<T>(
 
     // 处理token过期
     if (response.status === 401 && !isPublicEndpoint(endpoint)) {
-      const refreshToken = localStorage.getItem('wlbj_refresh_token');
+      // 首先尝试普通用户的刷新token，然后尝试管理员的
+      let refreshToken = localStorage.getItem('wlbj_refresh_token');
+      let isAdmin = false;
+
+      if (!refreshToken) {
+        refreshToken = localStorage.getItem('wlbj_admin_refresh_token');
+        isAdmin = true;
+      }
+
       if (refreshToken) {
         try {
           // 尝试刷新token
@@ -95,8 +107,14 @@ async function apiRequest<T>(
           if (refreshResponse.ok) {
             const tokenData = await refreshResponse.json();
             if (tokenData.accessToken && tokenData.refreshToken) {
-              localStorage.setItem('wlbj_access_token', tokenData.accessToken);
-              localStorage.setItem('wlbj_refresh_token', tokenData.refreshToken);
+              // 根据用户类型保存新token
+              if (isAdmin) {
+                localStorage.setItem('wlbj_admin_access_token', tokenData.accessToken);
+                localStorage.setItem('wlbj_admin_refresh_token', tokenData.refreshToken);
+              } else {
+                localStorage.setItem('wlbj_access_token', tokenData.accessToken);
+                localStorage.setItem('wlbj_refresh_token', tokenData.refreshToken);
+              }
 
               // 使用新token重试原请求
               const newHeaders = {
@@ -119,10 +137,13 @@ async function apiRequest<T>(
         }
       }
 
-      // 如果刷新失败，清除认证信息
+      // 如果刷新失败，清除认证信息（包括管理员和普通用户）
       localStorage.removeItem('wlbj_access_token');
       localStorage.removeItem('wlbj_refresh_token');
       localStorage.removeItem('wlbj_user');
+      localStorage.removeItem('wlbj_admin_access_token');
+      localStorage.removeItem('wlbj_admin_refresh_token');
+      localStorage.removeItem('wlbj_admin_user');
 
       throw new Error('认证已过期，请重新登录');
     }
@@ -153,7 +174,7 @@ export const authAPI = {
       localStorage.setItem('wlbj_access_token', response.accessToken);
       localStorage.setItem('wlbj_refresh_token', response.refreshToken);
       localStorage.setItem('wlbj_user', JSON.stringify(response.user));
-      httpClient.setToken(response.accessToken);
+      httpClient.setToken(response.accessToken, false); // 标记为普通用户token
     }
 
     return response;
@@ -171,7 +192,7 @@ export const authAPI = {
       localStorage.setItem('wlbj_access_token', response.accessToken);
       localStorage.setItem('wlbj_refresh_token', response.refreshToken);
       localStorage.setItem('wlbj_user', JSON.stringify(response.user));
-      httpClient.setToken(response.accessToken);
+      httpClient.setToken(response.accessToken, false); // 标记为普通用户token
     }
 
     return response;
@@ -184,11 +205,20 @@ export const authAPI = {
       body: JSON.stringify({ refreshToken }),
     });
 
+    // 判断是否为管理员token
+    const isAdmin = localStorage.getItem('wlbj_admin_refresh_token') === refreshToken;
+
     // 保存新的token
     if (response.accessToken && response.refreshToken) {
-      localStorage.setItem('wlbj_access_token', response.accessToken);
-      localStorage.setItem('wlbj_refresh_token', response.refreshToken);
-      httpClient.setToken(response.accessToken);
+      if (isAdmin) {
+        localStorage.setItem('wlbj_admin_access_token', response.accessToken);
+        localStorage.setItem('wlbj_admin_refresh_token', response.refreshToken);
+        httpClient.setToken(response.accessToken, true);
+      } else {
+        localStorage.setItem('wlbj_access_token', response.accessToken);
+        localStorage.setItem('wlbj_refresh_token', response.refreshToken);
+        httpClient.setToken(response.accessToken, false);
+      }
     }
 
     return response;
@@ -219,49 +249,49 @@ export const authAPI = {
 
 // 用户相关API
 export const usersAPI = {
-  // 获取用户列表
+  // 获取用户列表（管理员功能）
   getUsers: async (params?: PaginationParams): Promise<PaginatedResponse<User>> => {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.pageSize) queryParams.append('pageSize', params.pageSize.toString());
     if (params?.search) queryParams.append('search', params.search);
-    
+
     const query = queryParams.toString();
-    return apiRequest<PaginatedResponse<User>>(`/users${query ? `?${query}` : ''}`);
+    return apiRequest<PaginatedResponse<User>>(`/admin/users/list${query ? `?${query}` : ''}`);
   },
 
-  // 获取单个用户
+  // 获取单个用户（管理员功能）
   getUser: async (userId: string): Promise<User> => {
-    return apiRequest<User>(`/users/${userId}`);
+    return apiRequest<User>(`/admin/users/${userId}`);
   },
 
-  // 创建用户
+  // 创建用户（管理员功能）
   createUser: async (userData: CreateUserRequest): Promise<User> => {
-    return apiRequest<User>('/users', {
+    return apiRequest<User>('/admin/users', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
   },
 
-  // 更新用户
+  // 更新用户（管理员功能）
   updateUser: async (userId: string, userData: UpdateUserRequest): Promise<User> => {
-    return apiRequest<User>(`/users/${userId}`, {
+    return apiRequest<User>(`/admin/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(userData),
     });
   },
 
-  // 删除用户
+  // 删除用户（管理员功能）
   deleteUser: async (userId: string): Promise<void> => {
-    return apiRequest<void>(`/users/${userId}`, {
+    return apiRequest<void>(`/admin/users/${userId}`, {
       method: 'DELETE',
     });
   },
 
-  // 更新用户密码
-  updatePassword: async (userId: string, passwordData: UpdatePasswordRequest): Promise<void> => {
-    return apiRequest<void>(`/users/${userId}/password`, {
-      method: 'PUT',
+  // 更新用户密码（使用统一的密码修改接口）
+  updatePassword: async (passwordData: UpdatePasswordRequest): Promise<void> => {
+    return apiRequest<void>('/auth/change-password', {
+      method: 'POST',
       body: JSON.stringify(passwordData),
     });
   },
@@ -296,7 +326,7 @@ export const usersAPI = {
 
 // 订单相关API
 export const ordersAPI = {
-  // 获取订单列表
+  // 获取订单列表（管理员功能）
   getOrders: async (params?: OrdersParams): Promise<PaginatedResponse<Order>> => {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
@@ -305,7 +335,7 @@ export const ordersAPI = {
     if (params?.status) queryParams.append('status', params.status);
 
     const query = queryParams.toString();
-    return apiRequest<PaginatedResponse<Order>>(`/orders${query ? `?${query}` : ''}`);
+    return apiRequest<PaginatedResponse<Order>>(`/admin/orders/all${query ? `?${query}` : ''}`);
   },
 
   // 获取单个订单
@@ -336,11 +366,10 @@ export const ordersAPI = {
     });
   },
 
-  // 选择供应商
-  selectProvider: async (orderId: string, providerData: SelectProviderRequest): Promise<Order> => {
-    return apiRequest<Order>(`/orders/${orderId}/select-provider`, {
+  // 选择供应商（通过选择报价实现）
+  selectProvider: async (quoteId: string): Promise<Order> => {
+    return apiRequest<Order>(`/quotes/${quoteId}/select`, {
       method: 'POST',
-      body: JSON.stringify(providerData),
     });
   },
 
@@ -365,14 +394,14 @@ export const quotesAPI = {
     return apiRequest<PaginatedResponse<Quote>>(`/quotes${query ? `?${query}` : ''}`);
   },
 
-  // 获取订单的报价
+  // 获取订单的报价（修复路径）
   getOrderQuotes: async (orderId: string): Promise<Quote[]> => {
-    return apiRequest<Quote[]>(`/orders/${orderId}/quotes`);
+    return apiRequest<Quote[]>(`/quotes/orders/${orderId}`);
   },
 
-  // 创建报价
+  // 创建报价（使用请求体中的orderId）
   createQuote: async (quoteData: CreateQuoteRequest): Promise<Quote> => {
-    return apiRequest<Quote>('/quotes', {
+    return apiRequest<Quote>(`/quotes/orders/${quoteData.orderId}`, {
       method: 'POST',
       body: JSON.stringify(quoteData),
     });
@@ -463,19 +492,23 @@ export const providersAPI = {
 export const adminAPI = {
   // 管理员登录
   login: async (password: string): Promise<LoginResponse> => {
-    const response = await apiRequest<LoginResponse>('/admin/login', {
+    const response = await apiRequest<{data: LoginResponse}>('/admin/login', {
       method: 'POST',
       body: JSON.stringify({ password }),
     });
 
+    // 提取实际的登录数据
+    const loginData = response.data;
+
     // 保存管理员认证信息
-    if (response.accessToken && response.refreshToken) {
-      localStorage.setItem('wlbj_admin_access_token', response.accessToken);
-      localStorage.setItem('wlbj_admin_refresh_token', response.refreshToken);
-      localStorage.setItem('wlbj_admin_user', JSON.stringify(response.user));
+    if (loginData.accessToken && loginData.refreshToken) {
+      localStorage.setItem('wlbj_admin_access_token', loginData.accessToken);
+      localStorage.setItem('wlbj_admin_refresh_token', loginData.refreshToken);
+      localStorage.setItem('wlbj_admin_user', JSON.stringify(loginData.user));
+      httpClient.setToken(loginData.accessToken, true); // 标记为管理员token
     }
 
-    return response;
+    return loginData;
   },
 
   // 获取系统统计信息
@@ -488,6 +521,43 @@ export const adminAPI = {
     return apiRequest<void>('/admin/password', {
       method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  },
+
+  // 获取系统配置
+  getSystemConfig: async (configKey?: string): Promise<any> => {
+    const params = configKey ? `?configKey=${configKey}` : '';
+    return apiRequest<any>(`/admin/system-config${params}`);
+  },
+
+  // 更新系统配置
+  updateSystemConfig: async (configData: any): Promise<any> => {
+    return apiRequest<any>('/admin/system-config', {
+      method: 'PUT',
+      body: JSON.stringify(configData),
+    });
+  },
+
+  // 验证系统配置
+  validateSystemConfig: async (configData: any): Promise<void> => {
+    return apiRequest<void>('/admin/system-config/validate', {
+      method: 'POST',
+      body: JSON.stringify(configData),
+    });
+  },
+
+  // 重置配置为默认值
+  resetConfigToDefault: async (configKey: string): Promise<any> => {
+    return apiRequest<any>('/admin/system-config/reset', {
+      method: 'POST',
+      body: JSON.stringify({ configKey }),
+    });
+  },
+
+  // 初始化默认配置
+  initializeDefaultConfigs: async (): Promise<void> => {
+    return apiRequest<void>('/admin/system-config/initialize', {
+      method: 'POST',
     });
   },
 
@@ -539,9 +609,9 @@ export const adminAPI = {
 
 // 导出相关API
 export const exportAPI = {
-  // 导出订单
+  // 导出订单（使用管理员路由）
   exportOrders: async (format: 'csv' | 'excel' = 'excel'): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/export/orders?format=${format}`, {
+    const response = await fetch(`${API_BASE_URL}/admin/orders/export?format=${format}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('wlbj_access_token')}`,

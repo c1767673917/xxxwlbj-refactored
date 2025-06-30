@@ -7,6 +7,7 @@ const auth = require('./auth');
 const validation = require('./validation');
 const security = require('./security');
 const { globalErrorHandler, asyncHandler, initializeErrorHandling, asyncHandlerWithRetry, createBusinessError } = require('./errorHandler');
+const { activityLogger, recordActivity } = require('./activityLogger');
 
 module.exports = {
   // 认证相关中间件
@@ -23,5 +24,9 @@ module.exports = {
   asyncHandler,
   initializeErrorHandling,
   asyncHandlerWithRetry,
-  createBusinessError
+  createBusinessError,
+
+  // 活动记录中间件
+  activityLogger,
+  recordActivity
 };

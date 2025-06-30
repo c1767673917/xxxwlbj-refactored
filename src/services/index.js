@@ -6,8 +6,10 @@
 const OrderService = require('./OrderService');
 const QuoteService = require('./QuoteService');
 const UserService = require('./UserService');
+const ProviderService = require('./ProviderService');
 const NotificationService = require('./NotificationService');
 const OrderIdService = require('./OrderIdService');
+const SystemConfigService = require('./SystemConfigService');
 const { logger } = require('../config/logger');
 
 class ServiceFactory {
@@ -29,8 +31,10 @@ class ServiceFactory {
       this.services.set('order', new OrderService());
       this.services.set('quote', new QuoteService());
       this.services.set('user', new UserService());
+      this.services.set('provider', new ProviderService());
       this.services.set('notification', new NotificationService());
       this.services.set('orderId', new OrderIdService());
+      this.services.set('systemConfig', new SystemConfigService());
 
       this.initialized = true;
       logger.info('Service工厂初始化完成', {
@@ -87,6 +91,14 @@ class ServiceFactory {
   }
 
   /**
+   * 获取供应商Service
+   * @returns {ProviderService} 供应商Service实例
+   */
+  get provider() {
+    return this.getService('provider');
+  }
+
+  /**
    * 获取通知Service
    * @returns {NotificationService} 通知Service实例
    */
@@ -100,6 +112,14 @@ class ServiceFactory {
    */
   get orderId() {
     return this.getService('orderId');
+  }
+
+  /**
+   * 获取系统配置Service
+   * @returns {SystemConfigService} 系统配置Service实例
+   */
+  get systemConfig() {
+    return this.getService('systemConfig');
   }
 
   /**
@@ -160,8 +180,10 @@ module.exports = {
   OrderService,
   QuoteService,
   UserService,
+  ProviderService,
   NotificationService,
   OrderIdService,
+  SystemConfigService,
   
   // 便捷的访问方式
   get orderService() {
@@ -175,12 +197,20 @@ module.exports = {
   get userService() {
     return serviceFactory.user;
   },
-  
+
+  get providerService() {
+    return serviceFactory.provider;
+  },
+
   get notificationService() {
     return serviceFactory.notification;
   },
   
   get orderIdService() {
     return serviceFactory.orderId;
+  },
+
+  get systemConfigService() {
+    return serviceFactory.systemConfig;
   }
 };

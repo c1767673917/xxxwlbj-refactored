@@ -15,6 +15,7 @@ jest.mock('../../../src/services', () => ({
     cancelOrder: jest.fn(),
     selectProvider: jest.fn(),
     getOrderStats: jest.fn(),
+    getUserOrderStats: jest.fn(),
     getPendingOrders: jest.fn(),
     batchUpdateOrders: jest.fn(),
     exportOrders: jest.fn()
@@ -572,13 +573,13 @@ describe('OrderController', () => {
         meta: {}
       };
 
-      orderService.getOrderStats.mockResolvedValue(mockResult);
+      orderService.getUserOrderStats.mockResolvedValue(mockResult);
 
       // 执行测试
       await orderController.getOrderStats(mockReq, mockRes, mockNext);
 
       // 验证结果
-      expect(orderService.getOrderStats).toHaveBeenCalledWith('test-user-id', 'user', {
+      expect(orderService.getUserOrderStats).toHaveBeenCalledWith('test-user-id', 'user', {
         startDate: '2025-06-01',
         endDate: '2025-06-30'
       });
@@ -609,13 +610,13 @@ describe('OrderController', () => {
         meta: {}
       };
 
-      orderService.getOrderStats.mockResolvedValue(mockResult);
+      orderService.getUserOrderStats.mockResolvedValue(mockResult);
 
       // 执行测试
       await orderController.getOrderStats(mockReq, mockRes, mockNext);
 
       // 验证结果
-      expect(orderService.getOrderStats).toHaveBeenCalledWith('test-user-id', 'user', {});
+      expect(orderService.getUserOrderStats).toHaveBeenCalledWith('test-user-id', 'user', {});
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
   });
@@ -680,13 +681,13 @@ describe('OrderController', () => {
       await orderController.getPendingOrders(mockReq, mockRes, mockNext);
 
       // 验证错误处理
-      expect(mockNext).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('权限不足'),
-          statusCode: 403,
-          code: 'INSUFFICIENT_PERMISSIONS'
-        })
-      );
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        message: expect.stringContaining('权限不足'),
+        code: 'INSUFFICIENT_PERMISSIONS',
+        timestamp: expect.any(String)
+      });
     });
   });
 
@@ -703,6 +704,25 @@ describe('OrderController', () => {
         startDate: '2025-06-01',
         endDate: '2025-06-30'
       };
+
+      // 模拟服务响应
+      const mockResult = {
+        data: {
+          downloadUrl: '/api/downloads/orders_export_123456.csv',
+          expiresAt: '2025-06-28T12:00:00Z'
+        },
+        message: '订单导出任务已创建',
+        meta: {
+          recordCount: 10,
+          filters: {
+            status: 'active',
+            startDate: '2025-06-01',
+            endDate: '2025-06-30'
+          }
+        }
+      };
+
+      orderService.exportOrders.mockResolvedValue(mockResult);
 
       // 执行测试
       await orderController.exportOrders(mockReq, mockRes, mockNext);
@@ -730,13 +750,13 @@ describe('OrderController', () => {
       await orderController.exportOrders(mockReq, mockRes, mockNext);
 
       // 验证错误处理
-      expect(mockNext).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('权限不足'),
-          statusCode: 403,
-          code: 'INSUFFICIENT_PERMISSIONS'
-        })
-      );
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        message: expect.stringContaining('权限不足'),
+        code: 'INSUFFICIENT_PERMISSIONS',
+        timestamp: expect.any(String)
+      });
     });
   });
 

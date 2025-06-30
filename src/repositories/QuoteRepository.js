@@ -616,12 +616,12 @@ class QuoteRepository extends BaseRepository {
       let query = this.query(trx)
         .select([
           'id',
-          'orderId',
-          'provider',
+          'order_id as orderId',
+          'provider_name as provider',
           'price',
-          'estimatedDelivery',
-          'createdAt',
-          'updatedAt'
+          'estimated_delivery as estimatedDelivery',
+          'created_at as createdAt',
+          'updated_at as updatedAt'
         ]);
 
       if (startDate && endDate) {
@@ -633,14 +633,14 @@ class QuoteRepository extends BaseRepository {
       }
 
       if (provider) {
-        query = query.where('provider', provider);
+        query = query.where('provider_name', provider);
       }
 
       if (orderId) {
-        query = query.where('orderId', orderId);
+        query = query.where('order_id', orderId);
       }
 
-      return await query.orderBy('createdAt', 'desc');
+      return await query.orderBy('created_at', 'desc');
     } catch (error) {
       logger.error('获取导出报价数据失败', {
         filters,
@@ -690,6 +690,170 @@ class QuoteRepository extends BaseRepository {
       };
     } catch (error) {
       logger.error('获取全局统计信息失败', {
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 查找用户的报价
+   * @param {Object} options - 查询选项
+   * @param {Object} trx - 可选的事务对象
+   * @returns {Promise<Object>} 分页的报价结果
+   */
+  async findUserQuotes(options = {}, trx = null) {
+    try {
+      const {
+        page = 1,
+        pageSize = 20,
+        orderBy = [{ column: 'createdAt', order: 'desc' }],
+        userId = null,
+        status = null,
+        provider = null,
+        minPrice = null,
+        maxPrice = null
+      } = options;
+
+      let query = this.db(this.tableName)
+        .select([
+          'quotes.*',
+          'orders.warehouse',
+          'orders.goods',
+          'orders.delivery_address as deliveryAddress',
+          'orders.status as orderStatus'
+        ])
+        .leftJoin('orders', 'quotes.order_id', 'orders.id');
+
+      if (trx) {
+        query = query.transacting(trx);
+      }
+
+      // 如果指定了用户ID，只查询该用户的订单报价
+      if (userId) {
+        query = query.where('orders.user_id', userId);
+      }
+
+      // 添加过滤条件
+      if (status) {
+        query = query.where('quotes.status', status);
+      }
+      if (provider) {
+        query = query.where('quotes.provider', 'like', `%${provider}%`);
+      }
+      if (minPrice !== null) {
+        query = query.where('quotes.price', '>=', minPrice);
+      }
+      if (maxPrice !== null) {
+        query = query.where('quotes.price', '<=', maxPrice);
+      }
+
+      // 获取总数
+      const countQuery = query.clone().clearSelect().count('quotes.id as count');
+      const [{ count }] = await countQuery;
+      const total = parseInt(count);
+
+      // 应用排序
+      if (Array.isArray(orderBy)) {
+        orderBy.forEach(sort => {
+          const column = sort.column.includes('.') ? sort.column : `quotes.${sort.column}`;
+          query = query.orderBy(column, sort.order || 'asc');
+        });
+      }
+
+      // 应用分页
+      const offset = (page - 1) * pageSize;
+      query = query.limit(pageSize).offset(offset);
+
+      const quotes = await query;
+
+      return {
+        data: quotes,
+        meta: {
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize)
+        }
+      };
+    } catch (error) {
+      logger.error('查找用户报价失败', {
+        options,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 根据订单ID数组批量查找报价
+   * @param {Array} orderIds - 订单ID数组
+   * @param {Object} trx - 可选的事务对象
+   * @returns {Promise<Array>} 报价数组
+   */
+  async findByOrderIds(orderIds, trx = null) {
+    try {
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        return [];
+      }
+
+      let query = this.db(this.tableName)
+        .select([
+          'quotes.*',
+          'orders.warehouse',
+          'orders.goods',
+          'orders.delivery_address as deliveryAddress',
+          'orders.status as orderStatus'
+        ])
+        .leftJoin('orders', 'quotes.order_id', 'orders.id')
+        .whereIn('quotes.order_id', orderIds)
+        .orderBy('quotes.order_id')
+        .orderBy('quotes.price', 'asc');
+
+      if (trx) {
+        query = query.transacting(trx);
+      }
+
+      return await query;
+    } catch (error) {
+      logger.error('批量查找报价失败', {
+        orderIds,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 检查供应商是否有关联的报价
+   * @param {string} providerId - 供应商ID
+   * @param {Object} trx - 可选的事务对象
+   * @returns {Promise<boolean>} 是否有关联报价
+   */
+  async hasProviderQuotes(providerId, trx = null) {
+    try {
+      // 首先通过供应商ID获取供应商名称
+      const providerQuery = this.db('providers').where('id', providerId).select('name');
+      if (trx) {
+        providerQuery.transacting(trx);
+      }
+      const provider = await providerQuery.first();
+
+      if (!provider) {
+        return false;
+      }
+
+      const query = this.db(this.tableName).where('provider', provider.name);
+
+      if (trx) {
+        query.transacting(trx);
+      }
+
+      const quoteCount = await query.count('id as count').first();
+      return parseInt(quoteCount.count) > 0;
+    } catch (error) {
+      logger.error('检查供应商报价失败', {
+        providerId,
         error: error.message
       });
       throw error;

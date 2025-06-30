@@ -32,11 +32,26 @@ router.get('/:id',
   orderController.getOrderById
 );
 
+// 更新整个订单
+router.put('/:id',
+  auth.authenticateToken,
+  validation.validateOrderId,
+  validation.validateOrderUpdate,
+  orderController.updateOrder
+);
+
 // 更新订单状态
 router.patch('/:id/status',
   auth.authenticateToken,
   validation.validateOrderId,
   orderController.updateOrderStatus
+);
+
+// 关闭订单
+router.post('/:id/close',
+  auth.authenticateToken,
+  validation.validateOrderId,
+  orderController.closeOrder
 );
 
 // 删除订单

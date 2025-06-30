@@ -94,7 +94,7 @@ describe('UserService', () => {
       expect(result.success).toBe(true);
       expect(result.message).toBe('用户注册成功');
       expect(result.data.user).toEqual(expectedUser);
-      expect(result.data.token).toBe('mock-jwt-token');
+      expect(result.data.accessToken).toBe('mock-jwt-token');
       
       expect(passwordPolicy.validatePassword).toHaveBeenCalledWith(
         validUserData.password,
@@ -213,7 +213,7 @@ describe('UserService', () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toBe('登录成功');
-      expect(result.data.token).toBe('mock-jwt-token');
+      expect(result.data.accessToken).toBe('mock-jwt-token');
       expect(result.data.user).toEqual(expect.objectContaining({
         id: mockUser.id,
         email: mockUser.email,
@@ -222,6 +222,9 @@ describe('UserService', () => {
       }));
 
       expect(userRepo.validateUser).toHaveBeenCalledWith('test@example.com', 'StrongPassword123!');
+
+      // 验证生成了两个token（accessToken和refreshToken）
+      expect(jwt.sign).toHaveBeenCalledTimes(2);
       expect(jwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({
           id: mockUser.id,
@@ -229,7 +232,16 @@ describe('UserService', () => {
           role: mockUser.role
         }),
         expect.any(String),
-        expect.objectContaining({ expiresIn: '15m' })
+        expect.objectContaining({ expiresIn: '1h' })
+      );
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: mockUser.id,
+          email: mockUser.email,
+          role: mockUser.role
+        }),
+        expect.any(String),
+        expect.objectContaining({ expiresIn: '7d' })
       );
     });
 
