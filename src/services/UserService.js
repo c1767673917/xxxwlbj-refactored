@@ -4,7 +4,7 @@
  */
 
 const BaseService = require('./BaseService');
-const { userRepo } = require('../repositories');
+const { userRepo, orderRepo, quoteRepo, providerRepo } = require('../repositories');
 const PasswordHistoryRepository = require('../repositories/PasswordHistoryRepository');
 const passwordPolicy = require('../utils/PasswordPolicy');
 const jwt = require('jsonwebtoken');
@@ -1234,31 +1234,63 @@ class UserService extends BaseService {
    */
   async getAdminStats() {
     return this.handleAsyncOperation(async () => {
-      // 获取用户统计
-      const userStats = await userRepo.getUserStats();
+      try {
+        // 并行获取各模块统计数据
+        const [userStats, orderStats, quoteStats] = await Promise.all([
+          userRepo.getUserStats(),
+          orderRepo.getGlobalStats().catch((error) => {
+            this.logOperation('order_stats_failed', { error: error.message });
+            return { total: 0, active: 0, completed: 0, recentOrders: [] };
+          }),
+          quoteRepo.getGlobalStats().catch((error) => {
+            this.logOperation('quote_stats_failed', { error: error.message });
+            return { totalQuotes: 0, recentQuotes: [] };
+          })
+        ]);
 
-      // 获取订单统计（如果有订单仓库的话）
-      // const orderStats = await orderRepo.getOrderStats();
+        // 获取供应商数量
+        let totalProviders = 0;
+        try {
+          totalProviders = await providerRepo.count();
+        } catch (error) {
+          this.logOperation('provider_count_failed', { error: error.message });
+        }
 
-      // 获取报价统计（如果有报价仓库的话）
-      // const quoteStats = await quoteRepo.getQuoteStats();
+        // 聚合数据为前端期望的格式
+        const stats = {
+          totalUsers: userStats.total || 0,
+          totalOrders: orderStats.total || 0,
+          activeOrders: orderStats.active || 0,
+          closedOrders: orderStats.completed || orderStats.closed || 0,
+          totalProviders: totalProviders,
+          totalQuotes: quoteStats.totalQuotes || 0,
+          recentOrders: orderStats.recentOrders || [],
+          recentQuotes: quoteStats.recentQuotes || []
+        };
 
-      const stats = {
-        users: userStats,
-        system: {
-          uptime: process.uptime(),
-          nodeVersion: process.version,
-          platform: process.platform,
-          memory: process.memoryUsage()
-        },
-        timestamp: new Date().toISOString()
-      };
+        this.logOperation('admin_stats_retrieved', {
+          statsKeys: Object.keys(stats),
+          values: stats
+        });
 
-      this.logOperation('admin_stats_retrieved', {
-        statsKeys: Object.keys(stats)
-      });
+        return this.buildResponse(stats, '管理员统计信息获取成功');
+      } catch (error) {
+        this.logOperation('admin_stats_error', { error: error.message });
 
-      return this.buildResponse(stats, '管理员统计信息获取成功');
+        // 返回默认值避免前端显示错误
+        const defaultStats = {
+          totalUsers: 0,
+          totalOrders: 0,
+          activeOrders: 0,
+          closedOrders: 0,
+          totalProviders: 0,
+          totalQuotes: 0,
+          recentOrders: [],
+          recentQuotes: []
+        };
+
+        return this.buildResponse(defaultStats, '获取统计信息时发生错误，显示默认值');
+      }
     }, 'getAdminStats');
   }
 }

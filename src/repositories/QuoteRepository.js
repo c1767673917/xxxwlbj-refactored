@@ -657,7 +657,7 @@ class QuoteRepository extends BaseRepository {
    */
   async getGlobalStats(trx = null) {
     try {
-      const [totalStats, recentStats, providerCount] = await Promise.all([
+      const [totalStats, recentStats, providerCount, recentQuotesList] = await Promise.all([
         // 总体统计
         this.query(trx)
           .count('* as totalQuotes')
@@ -676,7 +676,13 @@ class QuoteRepository extends BaseRepository {
         // 供应商数量
         this.query(trx)
           .countDistinct('provider as providerCount')
-          .first()
+          .first(),
+
+        // 最近的报价（最多10条）
+        this.query(trx)
+          .select('*')
+          .orderBy('createdAt', 'desc')
+          .limit(10)
       ]);
 
       return {
@@ -685,7 +691,8 @@ class QuoteRepository extends BaseRepository {
         avgPrice: parseFloat(totalStats?.avgPrice || 0).toFixed(2),
         minPrice: parseFloat(totalStats?.minPrice || 0),
         maxPrice: parseFloat(totalStats?.maxPrice || 0),
-        recentQuotes: parseInt(recentStats?.recentQuotes || 0, 10),
+        recentQuotes: recentQuotesList || [],
+        recent30DaysCount: parseInt(recentStats?.recentQuotes || 0, 10),
         providerCount: parseInt(providerCount?.providerCount || 0, 10)
       };
     } catch (error) {

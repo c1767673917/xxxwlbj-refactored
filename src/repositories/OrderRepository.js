@@ -602,7 +602,7 @@ class OrderRepository extends BaseRepository {
    */
   async getGlobalStats(trx = null) {
     try {
-      const [statusStats, recentStats] = await Promise.all([
+      const [statusStats, recentStats, recentOrders] = await Promise.all([
         // 按状态统计
         this.query(trx)
           .select('status')
@@ -613,7 +613,13 @@ class OrderRepository extends BaseRepository {
         this.query(trx)
           .where('createdAt', '>=', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
           .count('* as recentCount')
-          .first()
+          .first(),
+
+        // 最近的订单（最多10条）
+        this.query(trx)
+          .select('*')
+          .orderBy('createdAt', 'desc')
+          .limit(10)
       ]);
 
       const result = {
@@ -622,7 +628,8 @@ class OrderRepository extends BaseRepository {
         confirmed: 0,
         completed: 0,
         cancelled: 0,
-        recent30Days: parseInt(recentStats?.recentCount || 0, 10)
+        recent30Days: parseInt(recentStats?.recentCount || 0, 10),
+        recentOrders: recentOrders || []
       };
 
       statusStats.forEach(stat => {

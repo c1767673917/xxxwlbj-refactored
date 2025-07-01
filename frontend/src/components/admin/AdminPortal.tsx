@@ -71,141 +71,167 @@ const AdminPortal = () => {
     }
   };
 
-  const renderDashboard = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">系统概览</h2>
-        <Button onClick={loadStats} variant="outline">
-          刷新数据
-        </Button>
-      </div>
+  const renderDashboard = () => {
+    // 创建安全的统计数据对象，提供默认值
+    const safeStats = {
+      totalUsers: stats?.totalUsers || 0,
+      totalOrders: stats?.totalOrders || 0,
+      activeOrders: stats?.activeOrders || 0,
+      closedOrders: stats?.closedOrders || 0,
+      totalProviders: stats?.totalProviders || 0,
+      totalQuotes: stats?.totalQuotes || 0,
+      recentOrders: stats?.recentOrders || [],
+      recentQuotes: stats?.recentQuotes || []
+    };
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, index) => (
-            <Card key={index} className="animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-            </Card>
-          ))}
-        </div>
-      ) : stats ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">总用户数</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
-                </div>
-                <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full">
-                  <Users size={24} className="text-blue-600" />
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">总订单数</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
-                  <p className="text-xs text-gray-500">
-                    活跃: {stats.activeOrders} | 已完成: {stats.closedOrders}
-                  </p>
-                </div>
-                <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
-                  <Package size={24} className="text-green-600" />
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">供应商数</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalProviders}</p>
-                </div>
-                <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full">
-                  <TruckIcon size={24} className="text-yellow-600" />
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">总报价数</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalQuotes}</p>
-                </div>
-                <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full">
-                  <FileText size={24} className="text-purple-600" />
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* 最近订单 */}
-          {stats.recentOrders && stats.recentOrders.length > 0 && (
-            <Card>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">最近订单</h3>
-              <div className="space-y-3">
-                {stats.recentOrders.slice(0, 5).map((order) => (
-                  <div key={order.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                    <div>
-                      <p className="font-medium text-gray-800">订单 #{order.id}</p>
-                      <p className="text-sm text-gray-600">
-                        {order.warehouse} → {order.deliveryAddress}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">
-                        {new Date(order.createdAt).toLocaleDateString('zh-CN')}
-                      </p>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        order.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {order.status === 'active' ? '进行中' : '已完成'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* 最近报价 */}
-          {stats.recentQuotes && stats.recentQuotes.length > 0 && (
-            <Card>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">最近报价</h3>
-              <div className="space-y-3">
-                {stats.recentQuotes.slice(0, 5).map((quote) => (
-                  <div key={quote.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                    <div>
-                      <p className="font-medium text-gray-800">报价 #{quote.id}</p>
-                      <p className="text-sm text-gray-600">订单 #{quote.orderId}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-green-600">¥{quote.price.toLocaleString()}</p>
-                      <p className="text-sm text-gray-600">
-                        {new Date(quote.createdAt).toLocaleDateString('zh-CN')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </>
-      ) : (
-        <Card className="text-center py-8">
-          <p className="text-gray-600">无法加载统计信息</p>
-          <Button onClick={loadStats} className="mt-4">
-            重试
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-gray-800">系统概览</h2>
+          <Button onClick={loadStats} variant="outline">
+            刷新数据
           </Button>
-        </Card>
-      )}
-    </div>
-  );
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, index) => (
+              <Card key={index} className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">总用户数</p>
+                    <p className="text-2xl font-bold text-gray-900">{safeStats.totalUsers}</p>
+                  </div>
+                  <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full">
+                    <Users size={24} className="text-blue-600" />
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">总订单数</p>
+                    <p className="text-2xl font-bold text-gray-900">{safeStats.totalOrders}</p>
+                    <p className="text-xs text-gray-500">
+                      活跃: {safeStats.activeOrders} | 已完成: {safeStats.closedOrders}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
+                    <Package size={24} className="text-green-600" />
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">供应商数</p>
+                    <p className="text-2xl font-bold text-gray-900">{safeStats.totalProviders}</p>
+                  </div>
+                  <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full">
+                    <TruckIcon size={24} className="text-yellow-600" />
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">总报价数</p>
+                    <p className="text-2xl font-bold text-gray-900">{safeStats.totalQuotes}</p>
+                  </div>
+                  <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full">
+                    <FileText size={24} className="text-purple-600" />
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* 最近订单 */}
+            {safeStats.recentOrders.length > 0 && (
+              <Card>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">最近订单</h3>
+                <div className="space-y-3">
+                  {safeStats.recentOrders.slice(0, 5).map((order) => (
+                    <div key={order.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                      <div>
+                        <p className="font-medium text-gray-800">订单 #{order.orderNumber || order.id}</p>
+                        <p className="text-sm text-gray-600">
+                          {order.warehouse && order.deliveryAddress
+                            ? `${order.warehouse} → ${order.deliveryAddress}`
+                            : order.description || '暂无描述'
+                          }
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">
+                          {new Date(order.createdAt).toLocaleDateString('zh-CN')}
+                        </p>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          order.status === 'active' ? 'bg-green-100 text-green-800' :
+                          order.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                          order.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {order.status === 'active' ? '进行中' :
+                           order.status === 'completed' ? '已完成' :
+                           order.status === 'confirmed' ? '已确认' :
+                           order.status || '未知'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* 最近报价 */}
+            {safeStats.recentQuotes.length > 0 && (
+              <Card>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">最近报价</h3>
+                <div className="space-y-3">
+                  {safeStats.recentQuotes.slice(0, 5).map((quote) => (
+                    <div key={quote.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                      <div>
+                        <p className="font-medium text-gray-800">{quote.provider || '未知供应商'}</p>
+                        <p className="text-sm text-gray-600">订单 #{quote.orderNumber || quote.orderId}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-green-600">¥{(quote.price || 0).toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">
+                          {new Date(quote.createdAt).toLocaleDateString('zh-CN')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* 如果没有数据显示提示 */}
+            {!stats && (
+              <Card className="text-center py-8">
+                <p className="text-gray-600">无法加载统计信息</p>
+                <Button onClick={loadStats} className="mt-4">
+                  重试
+                </Button>
+              </Card>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
 
   const menuItems = [
     { id: 'dashboard', label: '系统概览', icon: <BarChart3 size={20} /> },
