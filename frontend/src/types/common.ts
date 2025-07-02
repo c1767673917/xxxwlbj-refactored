@@ -17,7 +17,7 @@ export type Variant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger'
 export type UserRole = 'admin' | 'user' | 'provider';
 
 // 订单状态类型
-export type OrderStatus = 'active' | 'closed' | 'placeholder';
+export type OrderStatus = 'active' | 'completed' | 'cancelled' | 'placeholder';
 
 // 分页信息类型
 export interface PaginationInfo {

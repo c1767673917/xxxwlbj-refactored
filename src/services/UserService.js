@@ -170,7 +170,10 @@ class UserService extends BaseService {
         role: newUser.role
       });
 
-      return this.buildResponse(newUser, '用户创建成功');
+      // 转换字段名并清理敏感数据
+      const sanitizedUser = this.transformUserFields(this.sanitizeData(newUser));
+
+      return this.buildResponse(sanitizedUser, '用户创建成功');
     }, 'createUserByAdmin', { email: userData.email });
   }
 
@@ -200,8 +203,11 @@ class UserService extends BaseService {
       // 生成JWT令牌
       const tokens = this.generateToken(user);
 
+      // 转换字段名并清理敏感数据
+      const sanitizedUser = this.transformUserFields(this.sanitizeData(user));
+
       return this.buildResponse({
-        user,
+        user: sanitizedUser,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken
       }, '登录成功');
@@ -278,7 +284,7 @@ class UserService extends BaseService {
       return this.buildResponse({
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        user: this.sanitizeData(user)
+        user: this.transformUserFields(this.sanitizeData(user))
       }, 'Token刷新成功');
     }, 'refreshToken', { userId });
   }
@@ -320,7 +326,7 @@ class UserService extends BaseService {
       return this.buildResponse({
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        user: this.sanitizeData(user)
+        user: this.transformUserFields(this.sanitizeData(user))
       }, 'Token刷新成功');
     }, 'refreshTokenWithToken', { userId: decoded?.id });
   }
@@ -362,8 +368,8 @@ class UserService extends BaseService {
         throw this.createBusinessError('用户不存在', 'USER_NOT_FOUND', 404);
       }
 
-      // 清理敏感数据
-      const sanitizedUser = this.sanitizeData(user);
+      // 清理敏感数据并转换字段名
+      const sanitizedUser = this.transformUserFields(this.sanitizeData(user));
 
       return this.buildResponse(sanitizedUser, '获取用户信息成功');
     }, 'getUserById', { userId });
@@ -434,7 +440,7 @@ class UserService extends BaseService {
         updatedBy: currentUserRole
       });
 
-      return this.buildResponse(updatedUser, '用户信息更新成功');
+      return this.buildResponse(this.transformUserFields(this.sanitizeData(updatedUser)), '用户信息更新成功');
     }, 'updateUser', { userId });
   }
 
@@ -476,7 +482,7 @@ class UserService extends BaseService {
           reason: 'has_orders'
         });
 
-        return this.buildResponse(updatedUser, '用户已禁用（因为有关联订单）');
+        return this.buildResponse(this.transformUserFields(this.sanitizeData(updatedUser)), '用户已禁用（因为有关联订单）');
       }
 
       // 删除用户
@@ -599,10 +605,17 @@ class UserService extends BaseService {
       // 标准化排序参数
       const orderBy = this.normalizeOrderByParams(options.orderBy, this.allowedSortFields);
 
+      // 构建查询条件
+      const conditions = {};
+      if (options.role) {
+        conditions.role = options.role;
+      }
+      if (options.isActive !== undefined) {
+        conditions.is_active = options.isActive;
+      }
+
       // 构建查询选项
       const queryOptions = {
-        role: options.role || null,
-        isActive: options.isActive !== undefined ? options.isActive : null,
         limit: pagination.limit,
         offset: pagination.offset,
         orderBy: orderBy.length > 0 ? orderBy : [{ column: 'created_at', direction: 'desc' }]
@@ -610,8 +623,8 @@ class UserService extends BaseService {
 
       // 获取用户列表和总数
       const [users, total] = await Promise.all([
-        userRepo.findMany({}, queryOptions),
-        userRepo.count(options.role ? { role: options.role } : {})
+        userRepo.findMany(conditions, queryOptions),
+        userRepo.count(conditions)
       ]);
 
       return this.buildPaginatedResponse(users, total, pagination);
@@ -687,7 +700,7 @@ class UserService extends BaseService {
         changedBy: currentUserRole
       });
 
-      return this.buildResponse(updatedUser, `用户${isActive ? '激活' : '禁用'}成功`);
+      return this.buildResponse(this.transformUserFields(this.sanitizeData(updatedUser)), `用户${isActive ? '激活' : '禁用'}成功`);
     }, 'setUserActive', { userId, isActive });
   }
 
@@ -802,6 +815,40 @@ class UserService extends BaseService {
   }
 
   /**
+   * 转换用户字段名（数据库字段名到前端字段名）
+   * @param {Object} user - 用户对象
+   * @returns {Object} 转换后的用户对象
+   */
+  transformUserFields(user) {
+    if (!user || typeof user !== 'object') {
+      return user;
+    }
+
+    const transformed = { ...user };
+
+    // 字段名映射：数据库字段名 -> 前端字段名
+    const fieldMapping = {
+      'is_active': 'isActive',
+      'created_at': 'createdAt',
+      'updated_at': 'updatedAt',
+      'wechat_webhook_url': 'wechat_webhook_url', // 保持不变
+      'wechat_notification_enabled': 'wechat_notification_enabled' // 保持不变
+    };
+
+    // 执行字段名转换
+    Object.entries(fieldMapping).forEach(([dbField, frontendField]) => {
+      if (dbField in transformed) {
+        transformed[frontendField] = transformed[dbField];
+        if (dbField !== frontendField) {
+          delete transformed[dbField];
+        }
+      }
+    });
+
+    return transformed;
+  }
+
+  /**
    * 生成JWT令牌
    * @param {Object} user - 用户对象
    * @returns {Object} 包含accessToken和refreshToken的对象
@@ -850,8 +897,8 @@ class UserService extends BaseService {
         userRepo.countAll(queryOptions)
       ]);
 
-      // 清理敏感信息
-      const sanitizedUsers = users.map(user => this.sanitizeData(user));
+      // 清理敏感信息并转换字段名
+      const sanitizedUsers = users.map(user => this.transformUserFields(this.sanitizeData(user)));
 
       return this.buildPaginatedResponse(sanitizedUsers, totalCount, pagination);
     }, 'getAllUsers', { options });
@@ -894,7 +941,7 @@ class UserService extends BaseService {
         newStatus: status
       });
 
-      return this.buildResponse(this.sanitizeData(updatedUser), '用户状态更新成功');
+      return this.buildResponse(this.transformUserFields(this.sanitizeData(updatedUser)), '用户状态更新成功');
     }, 'updateUserStatus', { userId, status, adminId });
   }
 
@@ -1156,7 +1203,7 @@ class UserService extends BaseService {
       const tokens = this.generateToken(adminUser);
 
       return this.buildResponse({
-        user: adminUser,
+        user: this.transformUserFields(this.sanitizeData(adminUser)),
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken
       }, '管理员登录成功');

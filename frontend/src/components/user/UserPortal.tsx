@@ -5,12 +5,11 @@ import {
 } from 'lucide-react';
 import api from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
-import type { Order, Provider } from '@/types';
+import type { Order } from '@/types';
 
 const UserPortal = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [, ] = useState('activeOrders');
-  const [providers, setProviders] = useState<Provider[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [, setClosedOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +90,7 @@ const UserPortal = () => {
         page,
         pageSize: closedOrdersPagination.pageSize,
         search: search?.trim(),
-        status: 'closed'
+        status: 'completed'
       });
 
       // 处理后端返回的分页数据
@@ -125,8 +124,7 @@ const UserPortal = () => {
         // 并行加载数据
         await Promise.all([
           loadActiveOrders(1),
-          loadClosedOrders(1),
-          api.providers.getProviders().then(providersRes => setProviders(providersRes.items || []))
+          loadClosedOrders(1)
         ]);
       } catch (error) {
         console.error('加载数据失败:', error);
@@ -147,8 +145,7 @@ const UserPortal = () => {
       // 刷新当前页面的数据
       await Promise.all([
         loadActiveOrders(activeOrdersPagination.currentPage, searchTerm),
-        loadClosedOrders(closedOrdersPagination.currentPage, searchTerm),
-        api.providers.getProviders().then(providersRes => setProviders(providersRes.items || []))
+        loadClosedOrders(closedOrdersPagination.currentPage, searchTerm)
       ]);
     } catch (error) {
       console.error('刷新数据失败:', error);
@@ -321,11 +318,11 @@ const UserPortal = () => {
           <Card className="p-6">
             <div className="flex items-center">
               <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full">
-                <span className="text-2xl font-bold text-purple-600">{providers.length}</span>
+                <span className="text-2xl font-bold text-purple-600">{activeOrders.filter(o => o.selectedProvider).length}</span>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">合作供应商</p>
-                <p className="text-2xl font-bold text-gray-900">{providers.length}</p>
+                <p className="text-sm font-medium text-gray-600">已完成订单</p>
+                <p className="text-2xl font-bold text-gray-900">{activeOrders.filter(o => o.selectedProvider).length}</p>
               </div>
             </div>
           </Card>

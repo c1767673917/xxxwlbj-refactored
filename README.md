@@ -866,7 +866,36 @@ keepalive_timeout 65;
 | ----- | -------------------- | ------------ | ------ |
 | `GET` | `/api/users/profile` | 获取用户信息 | 需认证 |
 | `PUT` | `/api/users/profile` | 更新用户信息 | 需认证 |
-| `GET` | `/api/users`         | 获取用户列表 | 管理员 |
+
+### 👨‍💼 管理员接口
+
+#### 认证管理
+| 方法   | 路径                  | 描述         | 权限   |
+| ------ | --------------------- | ------------ | ------ |
+| `POST` | `/api/admin/login`    | 管理员登录   | 公开   |
+| `POST` | `/api/admin/logout`   | 管理员登出   | 管理员 |
+| `PUT`  | `/api/admin/password` | 修改管理员密码 | 管理员 |
+| `GET`  | `/api/admin/stats`    | 获取统计信息 | 管理员 |
+
+#### 用户管理
+| 方法     | 路径                           | 描述         | 权限   |
+| -------- | ------------------------------ | ------------ | ------ |
+| `GET`    | `/api/admin/users/list`        | 获取用户列表 | 管理员 |
+| `GET`    | `/api/admin/users/all`         | 获取所有用户 | 管理员 |
+| `POST`   | `/api/admin/users`             | 创建用户     | 管理员 |
+| `GET`    | `/api/admin/users/:userId`     | 获取用户详情 | 管理员 |
+| `PUT`    | `/api/admin/users/:userId`     | 更新用户信息 | 管理员 |
+| `DELETE` | `/api/admin/users/:userId`     | 删除用户     | 管理员 |
+
+#### 订单管理
+| 方法     | 路径                           | 描述         | 权限   |
+| -------- | ------------------------------ | ------------ | ------ |
+| `GET`    | `/api/admin/orders/pending`    | 获取待处理订单 | 管理员 |
+| `GET`    | `/api/admin/orders/all`        | 获取所有订单 | 管理员 |
+| `GET`    | `/api/admin/orders/:id`        | 获取订单详情 | 管理员 |
+| `PATCH`  | `/api/admin/orders/:id/status` | 更新订单状态 | 管理员 |
+| `DELETE` | `/api/admin/orders/:id`        | 删除订单     | 管理员 |
+| `GET`    | `/api/admin/orders/export`     | 导出订单数据 | 管理员 |
 
 ### 📊 监控接口
 

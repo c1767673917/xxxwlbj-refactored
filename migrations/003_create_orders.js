@@ -8,7 +8,7 @@ exports.up = function(knex) {
     table.string('warehouse', 200).notNullable().comment('仓库地址');
     table.text('goods').notNullable().comment('货物描述');
     table.string('delivery_address', 300).notNullable().comment('收货地址');
-    table.enum('status', ['active', 'closed', 'cancelled']).defaultTo('active').comment('订单状态');
+    table.enum('status', ['active', 'completed', 'cancelled']).defaultTo('active').comment('订单状态');
     table.string('selected_provider', 100).comment('选中的物流商');
     table.decimal('selected_price', 10, 2).comment('选中的价格');
     table.timestamp('selected_at').comment('选择时间');

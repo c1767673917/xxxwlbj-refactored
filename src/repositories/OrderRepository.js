@@ -24,10 +24,10 @@ class OrderRepository extends BaseRepository {
         status = null,
         limit = null,
         offset = null,
-        orderBy = [{ column: 'createdAt', direction: 'desc' }]
+        orderBy = [{ column: 'created_at', direction: 'desc' }]
       } = options;
 
-      const conditions = { userId };
+      const conditions = { user_id: userId };
       if (status) {
         conditions.status = status;
       }
@@ -60,12 +60,12 @@ class OrderRepository extends BaseRepository {
         userId = null,
         limit = null,
         offset = null,
-        orderBy = [{ column: 'createdAt', direction: 'desc' }]
+        orderBy = [{ column: 'created_at', direction: 'desc' }]
       } = options;
 
       const conditions = { status };
       if (userId) {
-        conditions.userId = userId;
+        conditions.user_id = userId;
       }
 
       return await this.findMany(conditions, {
@@ -98,14 +98,14 @@ class OrderRepository extends BaseRepository {
         status = null,
         limit = null,
         offset = null,
-        orderBy = [{ column: 'createdAt', direction: 'desc' }]
+        orderBy = [{ column: 'created_at', direction: 'desc' }]
       } = options;
 
       let query = this.query(trx)
-        .whereBetween('createdAt', [startDate, endDate]);
+        .whereBetween('created_at', [startDate, endDate]);
 
       if (userId) {
-        query = query.where('userId', userId);
+        query = query.where('user_id', userId);
       }
 
       if (status) {
@@ -151,7 +151,7 @@ class OrderRepository extends BaseRepository {
   async getActiveOrdersByUser(userId, trx = null) {
     return this.findByUserId(userId, {
       status: 'active',
-      orderBy: [{ column: 'createdAt', direction: 'desc' }]
+      orderBy: [{ column: 'created_at', direction: 'desc' }]
     }, trx);
   }
 
@@ -170,8 +170,8 @@ class OrderRepository extends BaseRepository {
 
       return await this.query(trx)
         .where('status', 'active')
-        .whereNull('selectedProvider')
-        .orderBy('createdAt', 'asc')
+        .whereNull('selected_provider')
+        .orderBy('created_at', 'asc')
         .limit(limit)
         .offset(offset);
     } catch (error) {
@@ -194,9 +194,9 @@ class OrderRepository extends BaseRepository {
   async selectProvider(orderId, provider, price, trx = null) {
     try {
       const updateData = {
-        selectedProvider: provider,
-        selectedPrice: price,
-        selectedAt: new Date().toISOString(),
+        selected_provider: provider,
+        selected_price: price,
+        selected_at: new Date().toISOString(),
         status: 'confirmed'
       };
 
@@ -223,11 +223,11 @@ class OrderRepository extends BaseRepository {
     try {
       const updateData = {
         status: 'cancelled',
-        cancelledAt: new Date().toISOString()
+        cancelled_at: new Date().toISOString()
       };
 
       if (reason) {
-        updateData.cancelReason = reason;
+        updateData.cancel_reason = reason;
       }
 
       return await this.updateById(orderId, updateData, trx);
@@ -251,7 +251,7 @@ class OrderRepository extends BaseRepository {
     try {
       const updateData = {
         status: 'completed',
-        completedAt: new Date().toISOString()
+        completed_at: new Date().toISOString()
       };
 
       return await this.updateById(orderId, updateData, trx);
@@ -281,11 +281,11 @@ class OrderRepository extends BaseRepository {
       let query = this.query(trx);
 
       if (userId) {
-        query = query.where('userId', userId);
+        query = query.where('user_id', userId);
       }
 
       if (startDate && endDate) {
-        query = query.whereBetween('createdAt', [startDate, endDate]);
+        query = query.whereBetween('created_at', [startDate, endDate]);
       }
 
       const stats = await query
@@ -354,12 +354,12 @@ class OrderRepository extends BaseRepository {
         query = query.where(function() {
           this.where('warehouse', 'like', `${searchTerm}%`)
             .orWhere('goods', 'like', `${searchTerm}%`)
-            .orWhere('deliveryAddress', 'like', `${searchTerm}%`);
+            .orWhere('delivery_address', 'like', `${searchTerm}%`);
         });
       }
 
       if (userId) {
-        query = query.where('userId', userId);
+        query = query.where('user_id', userId);
       }
 
       if (status) {
@@ -367,7 +367,7 @@ class OrderRepository extends BaseRepository {
       }
 
       return await query
-        .orderBy('createdAt', 'desc')
+        .orderBy('created_at', 'desc')
         .limit(Math.min(limit, 100)) // 限制最大返回数量
         .offset(offset);
     } catch (error) {
@@ -403,7 +403,7 @@ class OrderRepository extends BaseRepository {
       const {
         limit = 50,
         offset = 0,
-        orderBy = [{ column: 'createdAt', direction: 'desc' }]
+        orderBy = [{ column: 'created_at', direction: 'desc' }]
       } = options;
 
       let query = this.query(trx);
@@ -418,7 +418,7 @@ class OrderRepository extends BaseRepository {
           }
           this.orWhere('warehouse', 'like', `${term}%`)
             .orWhere('goods', 'like', `${term}%`)
-            .orWhere('deliveryAddress', 'like', `${term}%`);
+            .orWhere('delivery_address', 'like', `${term}%`);
         });
       }
 
@@ -432,7 +432,7 @@ class OrderRepository extends BaseRepository {
       }
 
       if (deliveryAddress) {
-        query = query.where('deliveryAddress', 'like', `${deliveryAddress}%`);
+        query = query.where('delivery_address', 'like', `${deliveryAddress}%`);
       }
 
       if (status) {
@@ -440,16 +440,16 @@ class OrderRepository extends BaseRepository {
       }
 
       if (userId) {
-        query = query.where('userId', userId);
+        query = query.where('user_id', userId);
       }
 
       // 日期范围搜索
       if (startDate && endDate) {
-        query = query.whereBetween('createdAt', [startDate, endDate]);
+        query = query.whereBetween('created_at', [startDate, endDate]);
       } else if (startDate) {
-        query = query.where('createdAt', '>=', startDate);
+        query = query.where('created_at', '>=', startDate);
       } else if (endDate) {
-        query = query.where('createdAt', '<=', endDate);
+        query = query.where('created_at', '<=', endDate);
       }
 
       // 应用排序
@@ -489,7 +489,7 @@ class OrderRepository extends BaseRepository {
 
       // 普通用户只能访问自己的订单
       const order = await this.findById(orderId, trx);
-      return order && order.userId === userId;
+      return order && order.user_id === userId;
     } catch (error) {
       logger.error('检查用户订单访问权限失败', {
         orderId,
@@ -519,19 +519,19 @@ class OrderRepository extends BaseRepository {
       let query = this.query(trx)
         .select([
           'id',
-          'userId',
+          'user_id',
           'warehouse',
           'goods',
-          'deliveryAddress',
+          'delivery_address',
           'status',
-          'selectedProvider',
-          'selectedPrice',
-          'selectedAt',
-          'createdAt',
-          'updatedAt',
-          'completedAt',
-          'cancelledAt',
-          'cancelReason'
+          'selected_provider',
+          'selected_price',
+          'selected_at',
+          'created_at',
+          'updated_at',
+          'completed_at',
+          'cancelled_at',
+          'cancel_reason'
         ]);
 
       if (status) {
@@ -539,18 +539,18 @@ class OrderRepository extends BaseRepository {
       }
 
       if (userId) {
-        query = query.where('userId', userId);
+        query = query.where('user_id', userId);
       }
 
       if (startDate && endDate) {
-        query = query.whereBetween('createdAt', [startDate, endDate]);
+        query = query.whereBetween('created_at', [startDate, endDate]);
       } else if (startDate) {
-        query = query.where('createdAt', '>=', startDate);
+        query = query.where('created_at', '>=', startDate);
       } else if (endDate) {
-        query = query.where('createdAt', '<=', endDate);
+        query = query.where('created_at', '<=', endDate);
       }
 
-      return await query.orderBy('createdAt', 'desc');
+      return await query.orderBy('created_at', 'desc');
     } catch (error) {
       logger.error('获取导出订单数据失败', {
         filters,
@@ -571,12 +571,12 @@ class OrderRepository extends BaseRepository {
       const {
         limit = 20,
         offset = 0,
-        orderBy = [{ column: 'createdAt', direction: 'asc' }]
+        orderBy = [{ column: 'created_at', direction: 'asc' }]
       } = options;
 
       let query = this.query(trx)
         .where('status', 'active')
-        .whereNull('selectedProvider')
+        .whereNull('selected_provider')
         .limit(limit)
         .offset(offset);
 
@@ -611,14 +611,14 @@ class OrderRepository extends BaseRepository {
 
         // 最近30天统计
         this.query(trx)
-          .where('createdAt', '>=', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+          .where('created_at', '>=', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
           .count('* as recentCount')
           .first(),
 
         // 最近的订单（最多10条）
         this.query(trx)
           .select('*')
-          .orderBy('createdAt', 'desc')
+          .orderBy('created_at', 'desc')
           .limit(10)
       ]);
 

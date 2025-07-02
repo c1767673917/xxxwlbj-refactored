@@ -29,7 +29,8 @@ export const USER_ROLES = {
 
 export const ORDER_STATUS = {
   ACTIVE: 'active',
-  CLOSED: 'closed',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
   PLACEHOLDER: 'placeholder',
 } as const;
 

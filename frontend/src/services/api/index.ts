@@ -149,13 +149,39 @@ async function apiRequest<T>(
     }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+      let errorData: any = {};
+      try {
+        errorData = await response.json();
+      } catch (parseError) {
+        console.warn('Failed to parse error response:', parseError);
+      }
+
+      const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+      console.error('API Error:', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        endpoint
+      });
+
+      throw new Error(errorMessage);
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('API请求失败:', error);
+  } catch (error: any) {
+    console.error('API请求失败:', {
+      url,
+      endpoint,
+      error: error.message,
+      stack: error.stack
+    });
+
+    // 如果是网络错误，提供更友好的错误信息
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('网络连接失败，请检查网络连接或稍后重试');
+    }
+
     throw error;
   }
 }
@@ -164,38 +190,44 @@ async function apiRequest<T>(
 export const authAPI = {
   // 用户登录
   login: async (password: string, email?: string): Promise<LoginResponse> => {
-    const response = await apiRequest<LoginResponse>('/auth/login', {
+    const response = await apiRequest<{success: boolean, data: LoginResponse, message: string}>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ password, email }),
+      body: JSON.stringify({ email, password }),
     });
 
+    // 提取实际的登录数据
+    const loginData = response.data;
+
     // 保存认证信息
-    if (response.accessToken && response.refreshToken) {
-      localStorage.setItem('wlbj_access_token', response.accessToken);
-      localStorage.setItem('wlbj_refresh_token', response.refreshToken);
-      localStorage.setItem('wlbj_user', JSON.stringify(response.user));
-      httpClient.setToken(response.accessToken, false); // 标记为普通用户token
+    if (loginData.accessToken && loginData.refreshToken) {
+      localStorage.setItem('wlbj_access_token', loginData.accessToken);
+      localStorage.setItem('wlbj_refresh_token', loginData.refreshToken);
+      localStorage.setItem('wlbj_user', JSON.stringify(loginData.user));
+      httpClient.setToken(loginData.accessToken, false); // 标记为普通用户token
     }
 
-    return response;
+    return loginData;
   },
 
   // 供应商登录
   loginProvider: async (accessKey: string): Promise<LoginResponse> => {
-    const response = await apiRequest<LoginResponse>('/auth/login/provider', {
+    const response = await apiRequest<{success: boolean, data: LoginResponse, message: string}>('/auth/login/provider', {
       method: 'POST',
       body: JSON.stringify({ accessKey }),
     });
 
+    // 提取实际的登录数据
+    const loginData = response.data;
+
     // 保存认证信息
-    if (response.accessToken && response.refreshToken) {
-      localStorage.setItem('wlbj_access_token', response.accessToken);
-      localStorage.setItem('wlbj_refresh_token', response.refreshToken);
-      localStorage.setItem('wlbj_user', JSON.stringify(response.user));
-      httpClient.setToken(response.accessToken, false); // 标记为普通用户token
+    if (loginData.accessToken && loginData.refreshToken) {
+      localStorage.setItem('wlbj_access_token', loginData.accessToken);
+      localStorage.setItem('wlbj_refresh_token', loginData.refreshToken);
+      localStorage.setItem('wlbj_user', JSON.stringify(loginData.user));
+      httpClient.setToken(loginData.accessToken, false); // 标记为普通用户token
     }
 
-    return response;
+    return loginData;
   },
 
   // 刷新token
@@ -326,8 +358,20 @@ export const usersAPI = {
 
 // 订单相关API
 export const ordersAPI = {
-  // 获取订单列表（管理员功能）
+  // 获取用户订单列表
   getOrders: async (params?: OrdersParams): Promise<PaginatedResponse<Order>> => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.pageSize) queryParams.append('pageSize', params.pageSize.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const query = queryParams.toString();
+    return apiRequest<PaginatedResponse<Order>>(`/orders${query ? `?${query}` : ''}`);
+  },
+
+  // 获取所有订单列表（管理员功能）
+  getAllOrders: async (params?: OrdersParams): Promise<PaginatedResponse<Order>> => {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.pageSize) queryParams.append('pageSize', params.pageSize.toString());

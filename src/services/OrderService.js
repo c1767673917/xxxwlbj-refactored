@@ -64,9 +64,8 @@ class OrderService extends BaseService {
         const newOrder = {
           id: orderId,
           ...cleanData,
-          userId,
-          status: 'active',
-          createdAt: new Date().toISOString()
+          user_id: userId,
+          status: 'active'
         };
 
         const createdOrder = await orderRepo.create(newOrder, trx);
@@ -140,13 +139,13 @@ class OrderService extends BaseService {
         status: options.status || null,
         limit: pagination.limit,
         offset: pagination.offset,
-        orderBy: orderBy.length > 0 ? orderBy : [{ column: 'createdAt', direction: 'desc' }]
+        orderBy: orderBy.length > 0 ? orderBy : [{ column: 'created_at', direction: 'desc' }]
       };
 
       // 获取订单列表和总数
       const [orders, total] = await Promise.all([
         orderRepo.findByUserId(userId, queryOptions),
-        orderRepo.count({ userId, ...(options.status && { status: options.status }) })
+        orderRepo.count({ user_id: userId, ...(options.status && { status: options.status }) })
       ]);
 
       return this.buildPaginatedResponse(orders, total, pagination);
@@ -527,7 +526,7 @@ class OrderService extends BaseService {
 
       // 非管理员只能查看自己的统计
       if (userRole !== 'admin' && userId) {
-        statsFilters.userId = userId;
+        statsFilters.user_id = userId;
       }
 
       const stats = await orderRepo.getOrderStats(statsFilters);
@@ -575,7 +574,7 @@ class OrderService extends BaseService {
 
       // 非管理员只能搜索自己的订单
       if (userRole !== 'admin') {
-        searchOptions.userId = userId;
+        searchOptions.user_id = userId;
       }
 
       const orders = await orderRepo.searchOrders(searchTerm, searchOptions);
@@ -653,13 +652,13 @@ class OrderService extends BaseService {
       const queryOptions = {
         limit: pagination.limit,
         offset: pagination.offset,
-        orderBy: orderBy.length > 0 ? orderBy : [{ column: 'createdAt', direction: 'asc' }]
+        orderBy: orderBy.length > 0 ? orderBy : [{ column: 'created_at', direction: 'asc' }]
       };
 
       // 获取待处理订单列表和总数
       const [orders, total] = await Promise.all([
         orderRepo.getPendingOrders(queryOptions),
-        orderRepo.count({ status: 'active', selectedProvider: null })
+        orderRepo.count({ status: 'active', selected_provider: null })
       ]);
 
       return this.buildPaginatedResponse(orders, total, pagination, '获取待处理订单成功');

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, Button } from '@/components/ui';
-import { UserIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon } from 'lucide-react';
+import { UserIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon, XIcon } from 'lucide-react';
 import api from '@/services/api';
-import type { User, PaginatedResponse } from '@/types';
+import type { User, PaginatedResponse, CreateUserRequest, UpdateUserRequest } from '@/types';
 
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -16,26 +16,61 @@ const UserManagement = () => {
     pageSize: 20
   });
 
+  // 模态框状态
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
+
+  // 表单数据
+  const [addFormData, setAddFormData] = useState<CreateUserRequest>({
+    email: '',
+    password: '',
+    name: ''
+  });
+  const [editFormData, setEditFormData] = useState<UpdateUserRequest>({
+    email: '',
+    name: ''
+  });
+
   // 加载用户列表
   const loadUsers = async (page: number = 1, search?: string) => {
     try {
       setLoading(true);
-      const response: PaginatedResponse<User> = await api.users.getUsers({
+      setError(null);
+
+      console.log('Loading users with params:', { page, search, pageSize: pagination.pageSize });
+
+      const response: any = await api.users.getUsers({
         page,
         pageSize: pagination.pageSize,
         search: search?.trim()
       });
 
-      setUsers(response.items || []);
+      console.log('Users loaded successfully:', response);
+
+      // 处理后端返回的数据结构
+      const users = response.data || [];
+      const meta = response.meta || {};
+      const paginationInfo = meta.pagination || {};
+
+      setUsers(users);
       setPagination({
-        currentPage: response.currentPage || page,
-        totalPages: response.totalPages || 1,
-        total: response.totalItems || 0,
+        currentPage: paginationInfo.page || page,
+        totalPages: paginationInfo.totalPages || 1,
+        total: paginationInfo.total || 0,
         pageSize: pagination.pageSize
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('加载用户列表失败:', error);
-      setError('加载用户列表失败');
+      console.error('Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        response: error?.response
+      });
+
+      const errorMessage = error?.message || '加载用户列表失败，请检查网络连接或联系管理员';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -59,18 +94,109 @@ const UserManagement = () => {
     }
 
     try {
+      console.log('Deleting user:', userId);
       await api.users.deleteUser(userId);
       await loadUsers(pagination.currentPage, searchTerm);
       window.alert('用户删除成功');
-    } catch (error) {
+    } catch (error: any) {
       console.error('删除用户失败:', error);
-      window.alert('删除用户失败');
+      console.error('Delete error details:', {
+        message: error?.message,
+        response: error?.response
+      });
+
+      const errorMessage = error?.message || '删除用户失败，请重试';
+      window.alert(`删除用户失败: ${errorMessage}`);
     }
   };
 
   // 分页处理
   const handlePageChange = (page: number) => {
     loadUsers(page, searchTerm);
+  };
+
+  // 添加用户处理
+  const handleAddUser = () => {
+    setAddFormData({
+      email: '',
+      password: '',
+      name: ''
+    });
+    setShowAddModal(true);
+  };
+
+  // 编辑用户处理
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditFormData({
+      email: user.email || '',
+      name: user.name || ''
+    });
+    setShowEditModal(true);
+  };
+
+  // 提交添加用户
+  const handleSubmitAddUser = async () => {
+    if (!addFormData.email || !addFormData.password || !addFormData.name) {
+      window.alert('请填写所有必填字段');
+      return;
+    }
+
+    try {
+      setModalLoading(true);
+      await api.users.createUser(addFormData);
+      setShowAddModal(false);
+      await loadUsers(pagination.currentPage, searchTerm);
+      window.alert('用户创建成功');
+    } catch (error: any) {
+      console.error('创建用户失败:', error);
+      const errorMessage = error?.message || '创建用户失败，请重试';
+      window.alert(`创建用户失败: ${errorMessage}`);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // 提交编辑用户
+  const handleSubmitEditUser = async () => {
+    if (!editingUser || !editFormData.email || !editFormData.name) {
+      window.alert('请填写所有必填字段');
+      return;
+    }
+
+    try {
+      setModalLoading(true);
+      await api.users.updateUser(editingUser.id, editFormData);
+      setShowEditModal(false);
+      setEditingUser(null);
+      await loadUsers(pagination.currentPage, searchTerm);
+      window.alert('用户更新成功');
+    } catch (error: any) {
+      console.error('更新用户失败:', error);
+      const errorMessage = error?.message || '更新用户失败，请重试';
+      window.alert(`更新用户失败: ${errorMessage}`);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // 关闭模态框
+  const handleCloseAddModal = () => {
+    setShowAddModal(false);
+    setAddFormData({
+      email: '',
+      password: '',
+      name: ''
+    });
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingUser(null);
+    setEditFormData({
+      email: '',
+      name: ''
+    });
   };
 
   if (loading) {
@@ -108,7 +234,11 @@ const UserManagement = () => {
       {/* 页面标题和操作 */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">用户管理</h2>
-        <Button variant="primary" icon={<PlusIcon size={16} />}>
+        <Button
+          variant="primary"
+          icon={<PlusIcon size={16} />}
+          onClick={handleAddUser}
+        >
           添加用户
         </Button>
       </div>
@@ -123,7 +253,7 @@ const UserManagement = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
           </div>
           <Button onClick={handleSearch} icon={<SearchIcon size={16} />}>
@@ -201,6 +331,7 @@ const UserManagement = () => {
                       variant="outline"
                       size="sm"
                       icon={<EditIcon size={14} />}
+                      onClick={() => handleEditUser(user)}
                     >
                       编辑
                     </Button>
@@ -250,6 +381,149 @@ const UserManagement = () => {
           </div>
         )}
       </Card>
+
+      {/* 添加用户模态框 */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">添加用户</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<XIcon size={16} />}
+                onClick={handleCloseAddModal}
+              >
+                关闭
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  邮箱 *
+                </label>
+                <input
+                  type="email"
+                  value={addFormData.email}
+                  onChange={(e) => setAddFormData({ ...addFormData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="请输入邮箱地址"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  姓名 *
+                </label>
+                <input
+                  type="text"
+                  value={addFormData.name}
+                  onChange={(e) => setAddFormData({ ...addFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="请输入用户姓名"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  密码 *
+                </label>
+                <input
+                  type="password"
+                  value={addFormData.password}
+                  onChange={(e) => setAddFormData({ ...addFormData, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="请输入密码"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={handleCloseAddModal}
+                disabled={modalLoading}
+              >
+                取消
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSubmitAddUser}
+                isLoading={modalLoading}
+              >
+                创建用户
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 编辑用户模态框 */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">编辑用户</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<XIcon size={16} />}
+                onClick={handleCloseEditModal}
+              >
+                关闭
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  邮箱 *
+                </label>
+                <input
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="请输入邮箱地址"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  姓名 *
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="请输入用户姓名"
+                />
+              </div>
+
+
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={handleCloseEditModal}
+                disabled={modalLoading}
+              >
+                取消
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSubmitEditUser}
+                isLoading={modalLoading}
+              >
+                更新用户
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -23,7 +23,7 @@ export interface Order {
   deliveryAddress: string;
   createdAt: string;
   updatedAt?: string;
-  status: 'active' | 'closed' | 'placeholder';
+  status: 'active' | 'completed' | 'cancelled' | 'placeholder';
   selectedProvider?: string;
   selectedPrice?: number;
   selectedAt?: string;
