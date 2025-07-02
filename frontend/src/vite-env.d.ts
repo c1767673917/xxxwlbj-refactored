@@ -5,7 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_APP_NAME: string;
   readonly VITE_APP_VERSION: string;
   readonly VITE_DEV_PORT: string;
-  readonly VITE_ENABLE_AI_RECOGNITION: string;
   readonly VITE_ENABLE_EXPORT: string;
   readonly VITE_ENABLE_NOTIFICATIONS: string;
   readonly VITE_DEBUG_MODE: string;

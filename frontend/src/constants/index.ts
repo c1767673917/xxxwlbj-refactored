@@ -66,7 +66,6 @@ export const PERFORMANCE_CONFIG = {
 } as const;
 
 export const FEATURE_FLAGS = {
-  AI_RECOGNITION: import.meta.env.VITE_ENABLE_AI_RECOGNITION === 'true',
   EXPORT: import.meta.env.VITE_ENABLE_EXPORT === 'true',
   NOTIFICATIONS: import.meta.env.VITE_ENABLE_NOTIFICATIONS === 'true',
 } as const;

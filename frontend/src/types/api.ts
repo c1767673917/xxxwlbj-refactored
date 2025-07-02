@@ -171,7 +171,7 @@ export interface UpdateUserRequest {
 export interface CreateOrderRequest {
   warehouse: string;
   goods: string;
-  destination: string;
+  deliveryAddress: string;
 }
 
 export interface UpdateOrderRequest {
@@ -233,16 +233,7 @@ export interface ResetPasswordRequest {
   newPassword: string;
 }
 
-// AI识别相关类型
-export interface AIRecognitionRequest {
-  text: string;
-}
 
-export interface AIRecognitionResponse {
-  warehouse: string;
-  goods: string;
-  destination: string;
-}
 
 // 系统健康检查类型
 export interface HealthCheckResponse {

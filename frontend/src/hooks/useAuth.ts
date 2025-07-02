@@ -46,7 +46,24 @@ export const useAuth = (): UseAuthReturn => {
           }
         } catch (error) {
           console.error('Token验证失败:', error);
-          // 清除无效的认证信息
+
+          // 尝试使用refresh token刷新
+          try {
+            await refreshToken();
+            // 刷新成功后重新获取用户数据
+            const updatedUserData = isAdmin
+              ? localStorage.getItem('wlbj_admin_user')
+              : localStorage.getItem('wlbj_user');
+            if (updatedUserData) {
+              const parsedUser = JSON.parse(updatedUserData);
+              setUser(parsedUser);
+              return; // 成功刷新，不需要清除认证信息
+            }
+          } catch (refreshError) {
+            console.error('Token刷新失败:', refreshError);
+          }
+
+          // 只有在刷新也失败时才清除认证信息
           if (isAdmin) {
             localStorage.removeItem('wlbj_admin_access_token');
             localStorage.removeItem('wlbj_admin_refresh_token');
@@ -147,11 +164,10 @@ export const useAuth = (): UseAuthReturn => {
 
       const response = await api.auth.refresh(refreshToken);
 
-      // 根据用户类型保存新的访问令牌
-      if (isAdmin) {
-        localStorage.setItem('wlbj_admin_access_token', response.accessToken);
-      } else {
-        localStorage.setItem('wlbj_access_token', response.accessToken);
+      // 根据用户类型保存新的访问令牌（api.auth.refresh已经处理了token保存）
+      // 这里只需要确认刷新成功
+      if (response.accessToken) {
+        console.log('Token刷新成功');
       }
     } catch (error) {
       console.error('刷新令牌失败:', error);

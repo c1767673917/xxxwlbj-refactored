@@ -27,8 +27,7 @@ import type {
   FileUploadResponse,
   UpdatePasswordRequest,
   ResetPasswordRequest,
-  // AIRecognitionRequest, // 暂时注释未使用的类型
-  AIRecognitionResponse,
+
   BackupConfig,
   BackupHistory,
   RestoreOptions,
@@ -106,20 +105,22 @@ async function apiRequest<T>(
 
           if (refreshResponse.ok) {
             const tokenData = await refreshResponse.json();
-            if (tokenData.accessToken && tokenData.refreshToken) {
+            if (tokenData.success && tokenData.data && tokenData.data.accessToken && tokenData.data.refreshToken) {
               // 根据用户类型保存新token
               if (isAdmin) {
-                localStorage.setItem('wlbj_admin_access_token', tokenData.accessToken);
-                localStorage.setItem('wlbj_admin_refresh_token', tokenData.refreshToken);
+                localStorage.setItem('wlbj_admin_access_token', tokenData.data.accessToken);
+                localStorage.setItem('wlbj_admin_refresh_token', tokenData.data.refreshToken);
+                localStorage.setItem('wlbj_admin_user', JSON.stringify(tokenData.data.user));
               } else {
-                localStorage.setItem('wlbj_access_token', tokenData.accessToken);
-                localStorage.setItem('wlbj_refresh_token', tokenData.refreshToken);
+                localStorage.setItem('wlbj_access_token', tokenData.data.accessToken);
+                localStorage.setItem('wlbj_refresh_token', tokenData.data.refreshToken);
+                localStorage.setItem('wlbj_user', JSON.stringify(tokenData.data.user));
               }
 
               // 使用新token重试原请求
               const newHeaders = {
                 ...headers,
-                'Authorization': `Bearer ${tokenData.accessToken}`,
+                'Authorization': `Bearer ${tokenData.data.accessToken}`,
               };
 
               const retryResponse = await fetch(url, {
@@ -232,28 +233,37 @@ export const authAPI = {
 
   // 刷新token
   refresh: async (refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> => {
-    const response = await apiRequest<{ accessToken: string; refreshToken: string }>('/auth/refresh', {
+    const response = await apiRequest<{success: boolean, data: { accessToken: string; refreshToken: string; user: any }, message: string}>('/auth/refresh', {
       method: 'POST',
       body: JSON.stringify({ refreshToken }),
     });
 
+    // 检查响应格式
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Token刷新失败');
+    }
+
+    const { accessToken, refreshToken: newRefreshToken, user } = response.data;
+
     // 判断是否为管理员token
     const isAdmin = localStorage.getItem('wlbj_admin_refresh_token') === refreshToken;
 
-    // 保存新的token
-    if (response.accessToken && response.refreshToken) {
+    // 保存新的token和用户信息
+    if (accessToken && newRefreshToken) {
       if (isAdmin) {
-        localStorage.setItem('wlbj_admin_access_token', response.accessToken);
-        localStorage.setItem('wlbj_admin_refresh_token', response.refreshToken);
-        httpClient.setToken(response.accessToken, true);
+        localStorage.setItem('wlbj_admin_access_token', accessToken);
+        localStorage.setItem('wlbj_admin_refresh_token', newRefreshToken);
+        localStorage.setItem('wlbj_admin_user', JSON.stringify(user));
+        httpClient.setToken(accessToken, true);
       } else {
-        localStorage.setItem('wlbj_access_token', response.accessToken);
-        localStorage.setItem('wlbj_refresh_token', response.refreshToken);
-        httpClient.setToken(response.accessToken, false);
+        localStorage.setItem('wlbj_access_token', accessToken);
+        localStorage.setItem('wlbj_refresh_token', newRefreshToken);
+        localStorage.setItem('wlbj_user', JSON.stringify(user));
+        httpClient.setToken(accessToken, false);
       }
     }
 
-    return response;
+    return { accessToken, refreshToken: newRefreshToken };
   },
 
   // 登出
@@ -714,16 +724,7 @@ export const exportAPI = {
   },
 };
 
-// AI识别相关API
-export const aiAPI = {
-  // 文本识别
-  recognizeText: async (text: string): Promise<AIRecognitionResponse> => {
-    return apiRequest<AIRecognitionResponse>('/ai/recognize', {
-      method: 'POST',
-      body: JSON.stringify({ text }),
-    });
-  },
-};
+
 
 // 统一API导出
 const api = {
@@ -734,7 +735,6 @@ const api = {
   providers: providersAPI,
   admin: adminAPI,
   export: exportAPI,
-  ai: aiAPI,
 };
 
 export default api;

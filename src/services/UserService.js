@@ -295,6 +295,15 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 新的token
    */
   async refreshTokenWithToken(refreshToken) {
+    // 先验证refresh token以获取用户ID用于日志记录
+    let userId = null;
+    try {
+      const decoded = this.verifyToken(refreshToken);
+      userId = decoded.id;
+    } catch (error) {
+      // 如果token无效，仍然继续处理，让内部逻辑处理错误
+    }
+
     return this.handleAsyncOperation(async () => {
       this.validateRequiredParams({ refreshToken }, ['refreshToken']);
 
@@ -328,7 +337,7 @@ class UserService extends BaseService {
         refreshToken: tokens.refreshToken,
         user: this.transformUserFields(this.sanitizeData(user))
       }, 'Token刷新成功');
-    }, 'refreshTokenWithToken', { userId: decoded?.id });
+    }, 'refreshTokenWithToken', { userId });
   }
 
   /**

@@ -40,7 +40,7 @@ const config = {
       console.warn('⚠️  Using development JWT secret. Set JWT_SECRET in production!');
       return process.env.JWT_SECRET || 'dev-only-secret-fixed-key-for-development';
     },
-    expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+    expiresIn: process.env.JWT_EXPIRES_IN || '2h', // 增加到2小时，避免频繁过期
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
 

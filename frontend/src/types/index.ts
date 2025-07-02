@@ -28,8 +28,6 @@ export type {
   FileUploadResponse,
   UpdatePasswordRequest,
   ResetPasswordRequest,
-  AIRecognitionRequest,
-  AIRecognitionResponse,
   HealthCheckResponse,
   BackupConfig,
   BackupHistory,

@@ -3,3 +3,4 @@ export { default as UserPortal } from './UserPortal';
 export { default as OrderList } from './OrderList';
 export { default as ProviderManagement } from './ProviderManagement';
 export { default as UserSettings } from './UserSettings';
+export { default as CreateOrderModal } from './CreateOrderModal';
