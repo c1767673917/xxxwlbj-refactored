@@ -7,7 +7,7 @@ exports.up = function(knex) {
   return Promise.all([
     // 1. 添加用户表的密码安全字段
     knex.schema.table('users', function(table) {
-      table.timestamp('password_changed_at').defaultTo(knex.fn.now()).comment('密码最后更改时间');
+      table.timestamp('password_changed_at').nullable().comment('密码最后更改时间');
       table.boolean('password_expired').defaultTo(false).comment('密码是否已过期');
       table.boolean('force_password_change').defaultTo(false).comment('是否强制更改密码');
       table.integer('failed_login_attempts').defaultTo(0).comment('失败登录尝试次数');

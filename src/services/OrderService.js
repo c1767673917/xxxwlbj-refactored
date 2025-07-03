@@ -58,12 +58,14 @@ class OrderService extends BaseService {
       // 在事务中创建订单
       const result = await orderRepo.transactionWithRetry(async (trx) => {
         // 生成订单ID
-        const orderId = await this.orderIdService.generateOrderId();
+        const orderId = await this.orderIdService.generateOrderId(trx);
 
         // 创建订单
         const newOrder = {
           id: orderId,
-          ...cleanData,
+          warehouse: cleanData.warehouse,
+          goods: cleanData.goods,
+          delivery_address: cleanData.deliveryAddress, // 映射到数据库字段名
           user_id: userId,
           status: 'active'
         };

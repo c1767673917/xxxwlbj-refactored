@@ -15,33 +15,30 @@ class OrderIdService {
   /**
    * 生成订单ID
    * 格式: RX + yymmdd + "-" + 3位流水号
+   * @param {Object} trx - 可选的事务对象
    * @returns {Promise<string>} 订单ID
    */
-  async generateOrderId() {
+  async generateOrderId(trx = null) {
     try {
-      const result = await transactionManager.executeWithRetry(async (trx) => {
-        const now = new Date();
-        const dateStr = this.formatDate(now);
-        const shortYear = now.getFullYear().toString().slice(-2);
-        const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        const day = now.getDate().toString().padStart(2, '0');
-        const datePrefix = `${shortYear}${month}${day}`;
+      const now = new Date();
+      const dateStr = this.formatDate(now);
+      const shortYear = now.getFullYear().toString().slice(-2);
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const day = now.getDate().toString().padStart(2, '0');
+      const datePrefix = `${shortYear}${month}${day}`;
 
-        // 使用原子操作获取并更新序列号
-        const sequence = await this.getNextSequence(trx, dateStr);
-        const orderId = `RX${datePrefix}-${sequence.toString().padStart(3, '0')}`;
+      // 使用原子操作获取并更新序列号
+      const sequence = await this.getNextSequence(trx, dateStr);
+      const orderId = `RX${datePrefix}-${sequence.toString().padStart(3, '0')}`;
 
-        logger.info('订单ID生成成功', {
-          orderId,
-          date: dateStr,
-          sequence,
-          operation: 'generateOrderId'
-        });
-
-        return orderId;
+      logger.info('订单ID生成成功', {
+        orderId,
+        date: dateStr,
+        sequence,
+        operation: 'generateOrderId'
       });
 
-      return result;
+      return orderId;
     } catch (error) {
       logger.error('订单ID生成失败', {
         error: error.message,
@@ -59,25 +56,33 @@ class OrderIdService {
    * @returns {Promise<number>} 序列号
    */
   async getNextSequence(trx, dateStr) {
+    // 如果没有传入事务对象，使用数据库连接
+    const connection = trx || db;
+
     // 尝试插入新的日期记录，如果已存在则忽略
-    await trx.raw(`
-      INSERT OR IGNORE INTO order_sequences (date, sequence, created_at, updated_at) 
+    await connection.raw(`
+      INSERT OR IGNORE INTO order_sequences (date, sequence, created_at, updated_at)
       VALUES (?, 0, datetime('now'), datetime('now'))
     `, [dateStr]);
 
-    // 原子性地增加序列号并返回新值
-    const result = await trx.raw(`
-      UPDATE order_sequences 
+    // 原子性地增加序列号
+    await connection.raw(`
+      UPDATE order_sequences
       SET sequence = sequence + 1, updated_at = datetime('now')
       WHERE date = ?
-      RETURNING sequence
     `, [dateStr]);
 
-    if (!result || result.length === 0) {
+    // 获取更新后的序列号
+    const result = await connection('order_sequences')
+      .select('sequence')
+      .where('date', dateStr)
+      .first();
+
+    if (!result) {
       throw new Error(`无法获取日期 ${dateStr} 的序列号`);
     }
 
-    return result[0].sequence;
+    return result.sequence;
   }
 
   /**
